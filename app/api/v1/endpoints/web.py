@@ -68,3 +68,19 @@ def inventory_purchases_page(request: Request):
 @router.get("/users", response_class=HTMLResponse, include_in_schema=False)
 def users_page(request: Request):
     return templates.TemplateResponse("users/index.html", {"request": request})
+
+
+# --- Customer online store (Phase 3) — no staff login required ---
+@router.get("/store", response_class=HTMLResponse, include_in_schema=False)
+def store_menu_page(request: Request):
+    return templates.TemplateResponse("store/index.html", {"request": request})
+
+
+@router.get("/store/cart", response_class=HTMLResponse, include_in_schema=False)
+def store_cart_page(request: Request):
+    return templates.TemplateResponse("store/cart.html", {"request": request})
+
+
+@router.get("/store/confirmation", response_class=HTMLResponse, include_in_schema=False)
+def store_confirmation_page(request: Request):
+    return templates.TemplateResponse("store/confirmation.html", {"request": request})

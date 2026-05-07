@@ -1,0 +1,63 @@
+{% extends "store/base_public.html" %}
+{% block title %}Order placed — Pod Café{% endblock %}
+
+{% block content %}
+<div class="text-center py-4">
+  <div class="mb-3 fs-1 text-success" aria-hidden="true">✓</div>
+  <h1 class="h4 fw-bold">Order received</h1>
+  <p class="text-secondary">Order number: <span class="fw-bold text-dark" id="ordId">—</span></p>
+  <p class="small text-secondary mb-4 mx-auto" style="max-width: 28rem">
+    We'll send you a <strong>WhatsApp</strong> when your order is <strong>ready</strong>. Please come to the café to pick it up once you get that message.
+  </p>
+
+  <div class="card rounded-4 border-0 shadow-sm mx-auto" style="max-width: 420px">
+    <div class="card-body text-start">
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-secondary">Status</span>
+        <span class="badge bg-secondary rounded-pill" id="ordStatus">—</span>
+      </div>
+      <div class="d-flex justify-content-between">
+        <span class="text-secondary">Total</span>
+        <span class="fw-bold" id="ordTotal">—</span>
+      </div>
+    </div>
+  </div>
+
+  <a href="/store" class="btn btn-outline-dark rounded-3 mt-4">New order</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  var id = params.get('order_id');
+  var elId = document.getElementById('ordId');
+  var elSt = document.getElementById('ordStatus');
+  var elTot = document.getElementById('ordTotal');
+  if (!id) {
+    elId.textContent = '?';
+    return;
+  }
+  elId.textContent = '#' + id;
+
+  function poll() {
+    fetch('/api/store/orders/' + encodeURIComponent(id) + '/status')
+      .then(function (r) {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then(function (o) {
+        elSt.textContent = o.status;
+        elTot.textContent = PodCafeStore.currencyBhd(o.total_amount);
+        if (o.status === 'ready') elSt.className = 'badge bg-success rounded-pill';
+        else if (o.status === 'cancelled') elSt.className = 'badge bg-danger rounded-pill';
+        else elSt.className = 'badge bg-secondary rounded-pill';
+      })
+      .catch(function () {});
+  }
+  poll();
+  setInterval(poll, 12000);
+})();
+</script>
+{% endblock %}

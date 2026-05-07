@@ -10,8 +10,28 @@ from app.models.product_modifier import ProductModifier
 from app.models.product_recipe import ProductRecipe
 from app.models.raw_material import RawMaterial
 from app.models.user import User
-from app.schemas.orders import OrderCreate, OrderModifierSnapshot
+from app.schemas.orders import OrderCreate, OrderItemIn, OrderModifierSnapshot
 from app.services import inventory_service
+
+
+def get_or_create_online_store_user(db: Session) -> User:
+    """Implicit staff account for web orders (appears in history)."""
+    u = db.query(User).filter(User.username == "online_store").first()
+    if u is not None:
+        return u
+    from app.core.config import settings
+    from app.core.security import hash_password
+
+    u = User(
+        name="Online store",
+        username="online_store",
+        password_hash=hash_password(f"!no-login-{settings.SECRET_KEY[:24]}"),
+        role="manager",
+        is_active=True,
+    )
+    db.add(u)
+    db.flush()
+    return u
 
 
 def _extra_price_for_modifiers(
@@ -35,15 +55,26 @@ def _extra_price_for_modifiers(
     return extras
 
 
-def create_pos_order(db: Session, user: User, payload: OrderCreate) -> Order:
+def _create_order_from_items(
+    db: Session,
+    *,
+    user_id: int,
+    source: str,
+    order_status: str,
+    customer_name: str | None,
+    customer_phone: str | None,
+    payment_method: str,
+    notes: str | None,
+    items: list[OrderItemIn],
+) -> Order:
     order = Order(
-        user_id=user.id,
-        customer_name=payload.customer_name,
-        customer_phone=payload.customer_phone,
-        payment_method=payload.payment_method,
-        source="pos",
-        status="delivered",
-        notes=payload.notes,
+        user_id=user_id,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        payment_method=payment_method,
+        source=source,
+        status=order_status,
+        notes=notes,
         total_amount=Decimal("0"),
         total_cost=Decimal("0"),
         profit=Decimal("0"),
@@ -54,7 +85,7 @@ def create_pos_order(db: Session, user: User, payload: OrderCreate) -> Order:
     total_amount = Decimal("0")
     total_cost = Decimal("0")
 
-    for line in payload.items:
+    for line in items:
         product = (
             db.query(Product)
             .filter(Product.id == line.product_id, Product.is_active.is_(True))
@@ -103,6 +134,43 @@ def create_pos_order(db: Session, user: User, payload: OrderCreate) -> Order:
         .options(joinedload(Order.items))
         .filter(Order.id == order.id)
         .one()
+    )
+
+
+def create_pos_order(db: Session, user: User, payload: OrderCreate) -> Order:
+    return _create_order_from_items(
+        db,
+        user_id=user.id,
+        source="pos",
+        order_status="delivered",
+        customer_name=payload.customer_name,
+        customer_phone=payload.customer_phone,
+        payment_method=payload.payment_method,
+        notes=payload.notes,
+        items=payload.items,
+    )
+
+
+def create_online_order(
+    db: Session,
+    *,
+    customer_name: str | None,
+    customer_phone: str,
+    payment_method: str,
+    notes: str | None,
+    items: list[OrderItemIn],
+) -> Order:
+    actor = get_or_create_online_store_user(db)
+    return _create_order_from_items(
+        db,
+        user_id=actor.id,
+        source="online",
+        order_status="pending",
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        payment_method=payment_method,
+        notes=notes,
+        items=items,
     )
 
 

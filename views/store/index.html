@@ -1,0 +1,201 @@
+{% extends "store/base_public.html" %}
+{% block title %}Menu — Pod Café{% endblock %}
+
+{% block content %}
+<div id="menuRoot">
+  <p class="text-secondary text-center py-5" id="menuLoading">Loading menu…</p>
+  <div id="menuErr" class="alert alert-danger rounded-3 d-none"></div>
+  <div id="menuBody" class="d-none"></div>
+</div>
+
+<div class="modal fade" id="addModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold" id="addTitle">Add item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="addBody"></div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-dark rounded-3" id="addConfirm">Add to cart</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var menu = null;
+  var pendingProduct = null;
+
+  function dispName(p) {
+    return (p && (p.name || p.name_ar)) || '';
+  }
+
+  function dispCatName(c) {
+    return (c && (c.name || c.name_ar)) || '';
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function groupModifiers(mods) {
+    var g = {};
+    (mods || []).forEach(function (m) {
+      var gn = m.group_name || 'Options';
+      if (!g[gn]) g[gn] = [];
+      g[gn].push(m);
+    });
+    return g;
+  }
+
+  function openAddModal(p) {
+    pendingProduct = p;
+    document.getElementById('addTitle').textContent = dispName(p);
+    var body = document.getElementById('addBody');
+    body.innerHTML = '';
+    var qtyRow = document.createElement('div');
+    qtyRow.className = 'mb-3';
+    qtyRow.innerHTML =
+      '<label class="form-label">Quantity</label>' +
+      '<input type="number" class="form-control rounded-3" id="addQty" min="1" value="1" aria-label="Quantity">';
+    body.appendChild(qtyRow);
+    var groups = groupModifiers(p.modifiers);
+    Object.keys(groups).forEach(function (gn) {
+      var opts = groups[gn];
+      var wrap = document.createElement('div');
+      wrap.className = 'mb-3';
+      var sid = 'mod_' + gn.replace(/\s/g, '_');
+      wrap.innerHTML =
+        '<label class="form-label">' + esc(gn) + '</label>' +
+        '<select class="form-select rounded-3 mod-select" data-group="' + esc(gn) + '" id="' + sid + '">';
+      var sel = wrap.querySelector('select');
+      opts.forEach(function (o) {
+        var ex = Number(o.extra_price) || 0;
+        var op = document.createElement('option');
+        op.value = JSON.stringify({
+          group_name: o.group_name,
+          option_name: o.option_name,
+          extra_price: o.extra_price,
+        });
+        op.textContent = o.option_name + (ex > 0 ? ' (+' + PodCafeStore.currencyBhd(ex) + ')' : '');
+        sel.appendChild(op);
+      });
+      body.appendChild(wrap);
+    });
+    new bootstrap.Modal(document.getElementById('addModal')).show();
+  }
+
+  function collectModifiersFromModal() {
+    var mods = [];
+    document.querySelectorAll('#addBody select.mod-select').forEach(function (sel) {
+      try {
+        mods.push(JSON.parse(sel.value));
+      } catch (e) {}
+    });
+    return mods;
+  }
+
+  document.getElementById('addConfirm').addEventListener('click', function () {
+    if (!pendingProduct) return;
+    var qty = parseInt(document.getElementById('addQty').value, 10) || 1;
+    if (qty < 1) qty = 1;
+    var line = {
+      product_id: pendingProduct.id,
+      name: dispName(pendingProduct),
+      base_price: Number(pendingProduct.price),
+      quantity: qty,
+      modifiers: collectModifiersFromModal(),
+    };
+    var cart = PodCafeStore.getCart();
+    cart.push(line);
+    PodCafeStore.setCart(cart);
+    bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+    PodCafeStore.updateNavBadge();
+  });
+
+  function renderMenu() {
+    var root = document.getElementById('menuBody');
+    root.innerHTML = '';
+    (menu.categories || []).forEach(function (cat) {
+      var h = document.createElement('h2');
+      h.className = 'h5 fw-bold mt-4 mb-3 text-dark';
+      h.textContent = dispCatName(cat);
+      root.appendChild(h);
+      var row = document.createElement('div');
+      row.className = 'row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3';
+      (cat.products || []).forEach(function (p) {
+        var col = document.createElement('div');
+        col.className = 'col';
+        var img = p.image_url
+          ? '<img src="' + esc(p.image_url) + '" class="rounded-top w-100" alt="">'
+          : '<div class="bg-secondary bg-opacity-10 rounded-top d-flex align-items-center justify-content-center" style="height:140px"><span class="text-secondary">No image</span></div>';
+        col.innerHTML =
+          '<div class="card h-100 shadow-sm rounded-4 overflow-hidden border-0">' +
+          '<div class="product-card">' +
+          img +
+          '</div>' +
+          '<div class="card-body">' +
+          '<h3 class="h6 fw-bold">' +
+          esc(dispName(p)) +
+          '</h3>' +
+          '<p class="small text-secondary mb-2">' +
+          esc(p.description || '') +
+          '</p>' +
+          '<div class="d-flex justify-content-between align-items-center">' +
+          '<span class="fw-bold">' +
+          PodCafeStore.currencyBhd(p.price) +
+          '</span>' +
+          '<button type="button" class="btn btn-dark btn-sm rounded-3 js-add" data-pid="' +
+          p.id +
+          '">Add</button>' +
+          '</div></div></div>';
+        row.appendChild(col);
+      });
+      root.appendChild(row);
+    });
+    root.querySelectorAll('.js-add').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = parseInt(btn.getAttribute('data-pid'), 10);
+        var found = null;
+        (menu.categories || []).forEach(function (c) {
+          (c.products || []).forEach(function (p) {
+            if (p.id === id) found = p;
+          });
+        });
+        if (found) openAddModal(found);
+      });
+    });
+  }
+
+  fetch('/api/store/menu')
+    .then(function (r) {
+      if (!r.ok) throw new Error('Could not load menu');
+      return r.json();
+    })
+    .then(function (data) {
+      menu = data;
+      document.getElementById('menuLoading').classList.add('d-none');
+      document.getElementById('menuBody').classList.remove('d-none');
+      if (!data.categories || !data.categories.length) {
+        document.getElementById('menuBody').innerHTML =
+          '<p class="text-center text-secondary">No products available right now.</p>';
+        return;
+      }
+      renderMenu();
+    })
+    .catch(function (e) {
+      document.getElementById('menuLoading').classList.add('d-none');
+      var er = document.getElementById('menuErr');
+      er.textContent = e.message || 'Something went wrong';
+      er.classList.remove('d-none');
+    });
+})();
+</script>
+{% endblock %}

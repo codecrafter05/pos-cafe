@@ -1,6 +1,8 @@
 from datetime import date, datetime, time, timezone
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_roles
@@ -10,7 +12,9 @@ from app.models.order_item import OrderItem
 from app.models.user import User
 from app.schemas.dashboard import OrderStatusUpdate
 from app.schemas.orders import OrderCreate, OrderItemOut, OrderOut
-from app.services import order_service
+from app.services import order_service, whatsapp_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -43,7 +47,7 @@ def list_orders(
 ):
     q = db.query(Order).options(joinedload(Order.items))
     if user.role == "cashier":
-        q = q.filter(Order.user_id == user.id)
+        q = q.filter(or_(Order.user_id == user.id, Order.source == "online"))
     if date_from is not None:
         start = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
         q = q.filter(Order.created_at >= start)
@@ -79,16 +83,31 @@ def update_order_status(
     db: Session = Depends(get_db),
     user: User = Depends(_staff),
 ):
-    order = db.get(Order, order_id)
+    order = (
+        db.query(Order)
+        .options(joinedload(Order.items).joinedload(OrderItem.product))
+        .filter(Order.id == order_id)
+        .first()
+    )
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    if user.role == "cashier" and order.user_id != user.id:
+    if user.role == "cashier" and order.user_id != user.id and order.source != "online":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    old_status = order.status
     order.status = body.status
     db.commit()
-    return (
-        db.query(Order).options(joinedload(Order.items)).filter(Order.id == order.id).one()
-    )
+    if (
+        body.status == "ready"
+        and old_status != "ready"
+        and order.source == "online"
+        and order.customer_phone
+    ):
+        try:
+            whatsapp_service.notify_order_ready(order.customer_phone, order.id)
+        except Exception:
+            logger.exception("WhatsApp ready notification failed")
+    db.refresh(order)
+    return _order_to_out(db, order)
 
 
 @router.get("/{order_id}", response_model=OrderOut)
@@ -105,6 +124,6 @@ def get_order(
     )
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    if user.role == "cashier" and order.user_id != user.id:
+    if user.role == "cashier" and order.user_id != user.id and order.source != "online":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     return _order_to_out(db, order)

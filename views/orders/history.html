@@ -50,6 +50,7 @@
             <th>ID</th>
             <th>When</th>
             <th class="text-end">Total</th>
+            <th>Source</th>
             <th>Status</th>
             <th class="text-end">Actions</th>
           </tr>
@@ -211,6 +212,9 @@
         '<td class="fw-semibold">#' + r.id + '</td>' +
         '<td class="text-secondary small">' + fmtWhen(r.created_at) + '</td>' +
         '<td class="text-end fw-semibold">' + PodCafe.currency(r.total_amount) + '</td>' +
+        '<td><span class="badge rounded-2 ' +
+        (r.source === 'online' ? 'bg-info bg-opacity-25 text-info' : 'bg-light text-secondary') +
+        '">' + esc(r.source || 'pos') + '</span></td>' +
         '<td><span class="badge bg-secondary bg-opacity-10 text-secondary rounded-2">' + esc(r.status) + '</span></td>' +
         '<td class="text-end text-nowrap">' +
           '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 me-1 js-view" data-id="' + r.id + '" title="عرض التفاصيل">View</button>' +

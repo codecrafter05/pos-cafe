@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import router
 from app.api.v1.endpoints.web import router as web_router
+from app.api.store import router as store_router
 from app.core.paths import PRODUCT_UPLOAD_DIR, STATIC_DIR, TEMPLATE_DIR
 
 
@@ -36,7 +37,9 @@ app.mount("/assets", StaticFiles(directory=str(TEMPLATE_DIR / "assets")), name="
 app.mount("/sass", StaticFiles(directory=str(TEMPLATE_DIR / "sass")), name="sass")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# API routes
+app.include_router(store_router, prefix="/api/store")
+
+# API routes (v1)
 app.include_router(router)
 
 # Web (HTML) routes — must come after static mounts
