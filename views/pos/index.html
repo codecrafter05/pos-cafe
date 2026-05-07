@@ -22,6 +22,15 @@
     white-space: pre-line;
     text-align: center;
   }
+  .pos-cat-tile:not(.is-active) {
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color);
+    background-color: transparent;
+  }
+  [data-bs-theme="light"] .pos-cat-tile:not(.is-active) {
+    color: var(--bs-emphasis-color);
+    background-color: var(--bs-tertiary-bg);
+  }
   .pos-cat-tile.is-active {
     color: #fff;
     background: linear-gradient(127deg, rgba(0, 140, 255, 0.95), rgba(160, 60, 220, 0.85));
@@ -181,7 +190,7 @@
     function addTile(id, label) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'btn btn-outline-light pos-cat-tile rounded-3';
+      btn.className = 'btn btn-sm btn-outline-secondary pos-cat-tile rounded-3';
       btn.setAttribute('data-category-id', id);
       btn.setAttribute('aria-pressed', id === selectedCategoryId ? 'true' : 'false');
       btn.textContent = label;

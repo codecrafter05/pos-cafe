@@ -126,6 +126,63 @@
     t.show();
   }
 
+  var THEME_STORAGE_KEY = 'podcafe_bs_theme';
+  var VALID_THEMES = ['blue-theme', 'light', 'dark', 'semi-dark', 'bodered-theme'];
+
+  function normalizeTheme(name) {
+    return VALID_THEMES.indexOf(name) >= 0 ? name : 'blue-theme';
+  }
+
+  function getTheme() {
+    return normalizeTheme(document.documentElement.getAttribute('data-bs-theme'));
+  }
+
+  function setTheme(name) {
+    name = normalizeTheme(name);
+    document.documentElement.setAttribute('data-bs-theme', name);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, name);
+    } catch (e) { /* private mode */ }
+    syncThemePickerUi();
+  }
+
+  function syncThemePickerUi() {
+    var current = getTheme();
+    document.querySelectorAll('[data-podcafe-theme]').forEach(function (el) {
+      var v = el.getAttribute('data-podcafe-theme');
+      el.classList.toggle('active', v === current);
+    });
+  }
+
+  function initThemePicker() {
+    document.body.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-podcafe-theme]');
+      if (!btn) return;
+      e.preventDefault();
+      var th = btn.getAttribute('data-podcafe-theme');
+      if (!th) return;
+      setTheme(th);
+      var menu = btn.closest('.dropdown-menu');
+      if (menu && window.bootstrap && bootstrap.Dropdown) {
+        var toggle = menu.previousElementSibling;
+        if (toggle && toggle.getAttribute('data-bs-toggle') === 'dropdown') {
+          var d = bootstrap.Dropdown.getInstance(toggle);
+          if (!d && typeof bootstrap.Dropdown.getOrCreateInstance === 'function') {
+            d = bootstrap.Dropdown.getOrCreateInstance(toggle);
+          }
+          if (d) d.hide();
+        }
+      }
+    });
+    syncThemePickerUi();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initThemePicker);
+  } else {
+    initThemePicker();
+  }
+
   window.PodCafe = {
     getToken: getToken,
     payloadFromToken: payloadFromToken,
@@ -133,5 +190,7 @@
     apiFetch: apiFetch,
     apiUpload: apiUpload,
     toast: toast,
+    getTheme: getTheme,
+    setTheme: setTheme,
   };
 })(window);

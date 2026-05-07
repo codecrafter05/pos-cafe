@@ -3,6 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem('podcafe_bs_theme');
+      if (t && /^(blue-theme|light|dark|semi-dark|bodered-theme)$/.test(t)) {
+        document.documentElement.setAttribute('data-bs-theme', t);
+      }
+    } catch (e) {}
+  })();
+  </script>
   <title>{% block title %}Pod Café{% endblock %}</title>
   <link rel="icon" href="/assets/images/favicon-32x32.png" type="image/png">
   <link href="/assets/css/pace.min.css" rel="stylesheet">
