@@ -14,7 +14,7 @@
   <div class="sidebar-nav">
     <ul class="metismenu" id="sidenav">
 
-      <li>
+      <li class="js-no-cashier">
         <a href="/dashboard">
           <div class="parent-icon"><i class="material-icons-outlined">dashboard</i></div>
           <div class="menu-title">Dashboard</div>
@@ -27,6 +27,13 @@
         <a href="/pos">
           <div class="parent-icon"><i class="material-icons-outlined">point_of_sale</i></div>
           <div class="menu-title">POS</div>
+        </a>
+      </li>
+
+      <li>
+        <a href="/orders/history">
+          <div class="parent-icon"><i class="material-icons-outlined">receipt_long</i></div>
+          <div class="menu-title">Order history</div>
         </a>
       </li>
 
@@ -50,6 +57,20 @@
         <a href="/menu/inventory">
           <div class="parent-icon"><i class="material-icons-outlined">inventory_2</i></div>
           <div class="menu-title">Raw materials</div>
+        </a>
+      </li>
+
+      <li class="js-admin-only">
+        <a href="/inventory/purchases">
+          <div class="parent-icon"><i class="material-icons-outlined">shopping_cart</i></div>
+          <div class="menu-title">Purchases</div>
+        </a>
+      </li>
+
+      <li class="js-owner-only">
+        <a href="/users">
+          <div class="parent-icon"><i class="material-icons-outlined">badge</i></div>
+          <div class="menu-title">Staff</div>
         </a>
       </li>
 

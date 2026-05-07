@@ -53,3 +53,18 @@ def menu_product_detail_page(request: Request, product_id: int):
 @router.get("/menu/inventory", response_class=HTMLResponse, include_in_schema=False)
 def menu_inventory_page(request: Request):
     return templates.TemplateResponse("menu/inventory.html", {"request": request})
+
+
+@router.get("/orders/history", response_class=HTMLResponse, include_in_schema=False)
+def orders_history_page(request: Request):
+    return templates.TemplateResponse("orders/history.html", {"request": request})
+
+
+@router.get("/inventory/purchases", response_class=HTMLResponse, include_in_schema=False)
+def inventory_purchases_page(request: Request):
+    return templates.TemplateResponse("inventory/purchases.html", {"request": request})
+
+
+@router.get("/users", response_class=HTMLResponse, include_in_schema=False)
+def users_page(request: Request):
+    return templates.TemplateResponse("users/index.html", {"request": request})

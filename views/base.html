@@ -89,6 +89,16 @@
           var li = el.closest('li');
           if (li) li.classList.add('d-none');
         });
+        document.querySelectorAll('.js-no-cashier').forEach(function (el) {
+          var li = el.closest('li');
+          if (li) li.classList.add('d-none');
+        });
+      }
+      if (role !== 'owner') {
+        document.querySelectorAll('.js-owner-only').forEach(function (el) {
+          var li = el.closest('li');
+          if (li) li.classList.add('d-none');
+        });
       }
     })();
 

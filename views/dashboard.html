@@ -4,7 +4,6 @@
 
 {% block content %}
 
-  <!-- Breadcrumb -->
   <div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
     <div class="breadcrumb-title pe-3">Pod Café</div>
     <div class="ps-3">
@@ -15,15 +14,18 @@
         </ol>
       </nav>
     </div>
-    <div class="ms-auto">
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <select class="form-select form-select-sm rounded-3" id="dashPeriod" style="width:auto; min-width: 8rem;">
+        <option value="today">Today</option>
+        <option value="week">Last 7 days</option>
+        <option value="month">This month</option>
+      </select>
       <span class="text-secondary" id="currentDate" style="font-size:14px;"></span>
     </div>
   </div>
 
-  <!-- ─── Row 1: Welcome + KPI cards ─── -->
   <div class="row g-3 mb-3">
 
-    <!-- Welcome Card -->
     <div class="col-xxl-8">
       <div class="card w-100 overflow-hidden rounded-4">
         <div class="card-body position-relative p-4">
@@ -36,24 +38,20 @@
                   <h4 class="fw-bold mb-0 js-user-email">Admin</h4>
                 </div>
               </div>
-              <div class="d-flex align-items-center gap-5">
+              <div class="d-flex flex-wrap align-items-center gap-4">
                 <div>
-                  <h4 class="mb-1 fw-semibold d-flex align-items-center gap-1">
-                    IQD 245K
-                    <i class="material-icons-outlined fs-5 text-success">arrow_upward</i>
+                  <h4 class="mb-1 fw-semibold d-flex align-items-center gap-1" id="dashRevenueBig">
+                    —
                   </h4>
-                  <p class="mb-2">Today's Revenue</p>
+                  <p class="mb-2 text-secondary">Revenue (period)</p>
                   <div class="progress" style="height:5px;">
                     <div class="progress-bar bg-grd-success" style="width:72%"></div>
                   </div>
                 </div>
-                <div class="vr"></div>
+                <div class="vr d-none d-md-block"></div>
                 <div>
-                  <h4 class="mb-1 fw-semibold d-flex align-items-center gap-1">
-                    47
-                    <i class="material-icons-outlined fs-5 text-success">arrow_upward</i>
-                  </h4>
-                  <p class="mb-2">Orders Today</p>
+                  <h4 class="mb-1 fw-semibold" id="dashOrdersBig">—</h4>
+                  <p class="mb-2 text-secondary">Orders (period)</p>
                   <div class="progress" style="height:5px;">
                     <div class="progress-bar bg-grd-danger" style="width:55%"></div>
                   </div>
@@ -68,7 +66,6 @@
       </div>
     </div>
 
-    <!-- KPI: Total Sales -->
     <div class="col-sm-6 col-xxl-2">
       <div class="card rounded-4 h-100">
         <div class="card-body">
@@ -77,52 +74,42 @@
               <span class="material-icons-outlined text-white">payments</span>
             </div>
             <div>
-              <h5 class="mb-0">IQD 245K</h5>
-              <p class="mb-0 text-secondary" style="font-size:12px;">Total Sales</p>
+              <h5 class="mb-0" id="dashAvgOrder">—</h5>
+              <p class="mb-0 text-secondary" style="font-size:12px;">Avg order</p>
             </div>
           </div>
-          <p class="mb-1 text-secondary" style="font-size:12px;">Today</p>
-          <div class="progress" style="height:5px;">
-            <div class="progress-bar bg-grd-primary" style="width:72%"></div>
-          </div>
-          <p class="mb-0 mt-1" style="font-size:11px;"><span class="text-success">+18%</span> vs yesterday</p>
+          <p class="mb-1 text-secondary" style="font-size:12px;">In selected period</p>
         </div>
       </div>
     </div>
 
-    <!-- KPI: Active Tables -->
     <div class="col-sm-6 col-xxl-2">
       <div class="card rounded-4 h-100">
         <div class="card-body">
           <div class="d-flex align-items-center gap-3 mb-2">
             <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-success">
-              <span class="material-icons-outlined text-white">table_restaurant</span>
+              <span class="material-icons-outlined text-white">savings</span>
             </div>
             <div>
-              <h5 class="mb-0">6 / 12</h5>
-              <p class="mb-0 text-secondary" style="font-size:12px;">Active Tables</p>
+              <h5 class="mb-0" id="dashProfit">—</h5>
+              <p class="mb-0 text-secondary" style="font-size:12px;">Net profit</p>
             </div>
           </div>
-          <p class="mb-1 text-secondary" style="font-size:12px;">Right now</p>
-          <div class="progress" style="height:5px;">
-            <div class="progress-bar bg-grd-success" style="width:50%"></div>
-          </div>
-          <p class="mb-0 mt-1" style="font-size:11px;">6 tables available</p>
+          <p class="mb-1 text-secondary" style="font-size:12px;">Non-cancelled orders</p>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- ─── Row 2: Revenue Chart + Top Items ─── -->
   <div class="row g-3 mb-3">
 
     <div class="col-xl-8">
       <div class="card rounded-4">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-3">
-            <h5 class="mb-0 fw-bold">Monthly Revenue</h5>
-            <span class="badge bg-primary bg-opacity-10 text-primary">This Year</span>
+            <h5 class="mb-0 fw-bold">Daily revenue</h5>
+            <span class="badge bg-primary bg-opacity-10 text-primary">Last 7 days</span>
           </div>
           <div id="revenueChart"></div>
         </div>
@@ -132,68 +119,9 @@
     <div class="col-xl-4">
       <div class="card rounded-4 h-100">
         <div class="card-body">
-          <h5 class="mb-3 fw-bold">Top Selling Items</h5>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item px-0 bg-transparent">
-              <div class="d-flex align-items-center gap-3">
-                <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-primary">
-                  <span class="material-icons-outlined text-white">coffee</span>
-                </div>
-                <div class="flex-grow-1">
-                  <h6 class="mb-0">Cappuccino</h6>
-                  <small class="text-secondary">138 orders</small>
-                </div>
-                <span class="badge bg-success bg-opacity-10 text-success">IQD 69K</span>
-              </div>
-            </li>
-            <li class="list-group-item px-0 bg-transparent">
-              <div class="d-flex align-items-center gap-3">
-                <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-success">
-                  <span class="material-icons-outlined text-white">local_cafe</span>
-                </div>
-                <div class="flex-grow-1">
-                  <h6 class="mb-0">Latte</h6>
-                  <small class="text-secondary">112 orders</small>
-                </div>
-                <span class="badge bg-success bg-opacity-10 text-success">IQD 56K</span>
-              </div>
-            </li>
-            <li class="list-group-item px-0 bg-transparent">
-              <div class="d-flex align-items-center gap-3">
-                <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-warning">
-                  <span class="material-icons-outlined text-white">emoji_food_beverage</span>
-                </div>
-                <div class="flex-grow-1">
-                  <h6 class="mb-0">Espresso</h6>
-                  <small class="text-secondary">98 orders</small>
-                </div>
-                <span class="badge bg-warning bg-opacity-10 text-warning">IQD 39K</span>
-              </div>
-            </li>
-            <li class="list-group-item px-0 bg-transparent">
-              <div class="d-flex align-items-center gap-3">
-                <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-info">
-                  <span class="material-icons-outlined text-white">bakery_dining</span>
-                </div>
-                <div class="flex-grow-1">
-                  <h6 class="mb-0">Croissant</h6>
-                  <small class="text-secondary">74 orders</small>
-                </div>
-                <span class="badge bg-info bg-opacity-10 text-info">IQD 22K</span>
-              </div>
-            </li>
-            <li class="list-group-item px-0 bg-transparent">
-              <div class="d-flex align-items-center gap-3">
-                <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-danger">
-                  <span class="material-icons-outlined text-white">icecream</span>
-                </div>
-                <div class="flex-grow-1">
-                  <h6 class="mb-0">Iced Mocha</h6>
-                  <small class="text-secondary">61 orders</small>
-                </div>
-                <span class="badge bg-danger bg-opacity-10 text-danger">IQD 18K</span>
-              </div>
-            </li>
+          <h5 class="mb-3 fw-bold">Top products</h5>
+          <ul class="list-group list-group-flush" id="dashTopProducts">
+            <li class="list-group-item px-0 bg-transparent text-secondary small">Loading…</li>
           </ul>
         </div>
       </div>
@@ -201,77 +129,20 @@
 
   </div>
 
-  <!-- ─── Row 3: Recent Orders ─── -->
   <div class="row g-3 mb-3">
-    <div class="col-12">
-      <div class="card rounded-4">
+    <div class="col-lg-6">
+      <div class="card rounded-4 h-100">
         <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h5 class="mb-0 fw-bold">Recent Orders</h5>
-            <a href="javascript:;" class="btn btn-sm btn-outline-primary">View All</a>
-          </div>
-          <div class="table-responsive">
-            <table class="table align-middle">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Items</th>
-                  <th>Table</th>
-                  <th>Staff</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><strong>#1042</strong></td>
-                  <td>Cappuccino ×2, Latte ×1</td>
-                  <td>Table 3</td>
-                  <td>Ahmad</td>
-                  <td>IQD 15,000</td>
-                  <td><span class="dash-lable bg-warning bg-opacity-10 text-warning rounded-2">Preparing</span></td>
-                  <td>2 min ago</td>
-                </tr>
-                <tr>
-                  <td><strong>#1041</strong></td>
-                  <td>Espresso ×1, Croissant ×2</td>
-                  <td>Table 7</td>
-                  <td>Sara</td>
-                  <td>IQD 12,500</td>
-                  <td><span class="dash-lable bg-success bg-opacity-10 text-success rounded-2">Completed</span></td>
-                  <td>8 min ago</td>
-                </tr>
-                <tr>
-                  <td><strong>#1040</strong></td>
-                  <td>Iced Mocha ×3</td>
-                  <td>Table 1</td>
-                  <td>Ahmad</td>
-                  <td>IQD 18,000</td>
-                  <td><span class="dash-lable bg-success bg-opacity-10 text-success rounded-2">Completed</span></td>
-                  <td>15 min ago</td>
-                </tr>
-                <tr>
-                  <td><strong>#1039</strong></td>
-                  <td>Latte ×2, Cheesecake ×1</td>
-                  <td>Table 5</td>
-                  <td>Sara</td>
-                  <td>IQD 20,000</td>
-                  <td><span class="dash-lable bg-primary bg-opacity-10 text-primary rounded-2">Served</span></td>
-                  <td>22 min ago</td>
-                </tr>
-                <tr>
-                  <td><strong>#1038</strong></td>
-                  <td>Americano ×1</td>
-                  <td>Table 9</td>
-                  <td>Ahmad</td>
-                  <td>IQD 5,000</td>
-                  <td><span class="dash-lable bg-danger bg-opacity-10 text-danger rounded-2">Cancelled</span></td>
-                  <td>35 min ago</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <h5 class="mb-3 fw-bold">Low stock</h5>
+          <div id="dashAlerts" class="small text-secondary">Loading…</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card rounded-4 h-100">
+        <div class="card-body">
+          <h5 class="mb-3 fw-bold">Peak hours (selected period)</h5>
+          <div id="dashPeak" class="small text-secondary">Loading…</div>
         </div>
       </div>
     </div>
@@ -279,26 +150,159 @@
 
 {% endblock %}
 
-
 {% block extra_js %}
 <script src="/assets/plugins/apexchart/apexcharts.min.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var options = {
-      series: [{ name: 'Revenue (IQD)',
-        data: [120000,145000,98000,175000,210000,195000,230000,215000,245000,270000,188000,245000]
-      }],
+(function () {
+  var p = PodCafe.payloadFromToken(PodCafe.getToken());
+  if (p && p.role === 'cashier') {
+    window.location.replace('/pos');
+    return;
+  }
+
+  var chart;
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
+    });
+  }
+
+  function renderChart(series, labels) {
+    var el = document.querySelector('#revenueChart');
+    if (!el || typeof ApexCharts === 'undefined') return;
+    if (chart) {
+      chart.destroy();
+      chart = null;
+    }
+    var opts = {
+      series: [{ name: 'Revenue', data: series }],
       chart: { type: 'area', height: 220, toolbar: { show: false } },
       dataLabels: { enabled: false },
       stroke: { curve: 'smooth', width: 2 },
-      fill: { type: 'gradient', gradient: { shadeIntensity:1, opacityFrom:0.4, opacityTo:0.05 } },
-      xaxis: { categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
-      yaxis: { labels: { formatter: function(v){ return (v/1000).toFixed(0)+'K'; } } },
+      fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.05 } },
+      xaxis: { categories: labels },
+      yaxis: { labels: { formatter: function (v) { return Number(v).toFixed(0); } } },
       colors: ['#0d6efd'],
-      tooltip: { y: { formatter: function(v){ return 'IQD '+v.toLocaleString(); } } },
+      tooltip: { y: { formatter: function (v) { return PodCafe.currency(v); } } },
       grid: { borderColor: '#f1f1f1' }
     };
-    new ApexCharts(document.querySelector('#revenueChart'), options).render();
-  });
+    chart = new ApexCharts(el, opts);
+    chart.render();
+  }
+
+  async function loadSummary(period) {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/summary?period=' + encodeURIComponent(period));
+    if (!res.ok) {
+      PodCafe.toast('Could not load summary', 'danger');
+      return;
+    }
+    var d = await res.json();
+    document.getElementById('dashRevenueBig').textContent = PodCafe.currency(d.revenue);
+    document.getElementById('dashOrdersBig').textContent = String(d.orders_count);
+    document.getElementById('dashAvgOrder').textContent = PodCafe.currency(d.avg_order_value);
+    document.getElementById('dashProfit').textContent = PodCafe.currency(d.net_profit);
+  }
+
+  async function loadChart() {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/sales-chart');
+    if (!res.ok) return;
+    var rows = await res.json();
+    var s = rows.map(function (r) { return Number(r.revenue); });
+    var lbl = rows.map(function (r) { return r.label; });
+    renderChart(s, lbl);
+  }
+
+  async function loadTop(period) {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/top-products?period=' + encodeURIComponent(period) + '&limit=6');
+    var ul = document.getElementById('dashTopProducts');
+    if (!res.ok) {
+      ul.innerHTML = '<li class="list-group-item px-0 bg-transparent text-danger small">Failed to load</li>';
+      return;
+    }
+    var rows = await res.json();
+    ul.innerHTML = '';
+    if (!rows.length) {
+      ul.innerHTML = '<li class="list-group-item px-0 bg-transparent text-secondary small">No sales in this period</li>';
+      return;
+    }
+    rows.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'list-group-item px-0 bg-transparent';
+      li.innerHTML =
+        '<div class="d-flex align-items-center gap-3">' +
+        '<div class="flex-grow-1"><h6 class="mb-0">' + esc(r.name) + '</h6>' +
+        '<small class="text-secondary">' + r.units_sold + ' sold</small></div>' +
+        '<span class="badge bg-success bg-opacity-10 text-success">' + PodCafe.currency(r.revenue) + '</span>' +
+        '</div>';
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadAlerts() {
+    var box = document.getElementById('dashAlerts');
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/inventory-alerts');
+    if (!res.ok) {
+      box.textContent = 'Could not load alerts';
+      return;
+    }
+    var rows = await res.json();
+    if (!rows.length) {
+      box.innerHTML = '<span class="text-success">All materials above minimum ✓</span>';
+      return;
+    }
+    box.innerHTML = '<ul class="list-unstyled mb-0"></ul>';
+    var ul = box.querySelector('ul');
+    rows.forEach(function (r) {
+      var li = document.createElement('li');
+      li.className = 'mb-2';
+      li.innerHTML =
+        '<span class="fw-semibold">' + esc(r.name) + '</span> — ' +
+        Number(r.current_stock).toFixed(3) + ' / min ' + Number(r.min_stock_alert).toFixed(3) + ' ' + esc(r.unit);
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadPeak(period) {
+    var box = document.getElementById('dashPeak');
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/peak-hours?period=' + encodeURIComponent(period));
+    if (!res.ok) {
+      box.textContent = 'Could not load peak hours';
+      return;
+    }
+    var rows = await res.json();
+    var max = 0;
+    rows.forEach(function (r) { if (r.orders > max) max = r.orders; });
+    if (!max) {
+      box.textContent = 'No orders in this window';
+      return;
+    }
+    box.innerHTML = '';
+    rows.forEach(function (r) {
+      if (!r.orders) return;
+      var pct = Math.round((r.orders / max) * 100);
+      var row = document.createElement('div');
+      row.className = 'mb-2';
+      row.innerHTML =
+        '<div class="d-flex justify-content-between"><span>' + r.hour + ':00</span><span class="text-secondary">' +
+        r.orders + ' orders</span></div>' +
+        '<div class="progress" style="height:6px;"><div class="progress-bar" style="width:' + pct + '%"></div></div>';
+      box.appendChild(row);
+    });
+  }
+
+  async function refreshAll() {
+    var period = document.getElementById('dashPeriod').value;
+    await Promise.all([
+      loadSummary(period),
+      loadChart(),
+      loadTop(period),
+      loadAlerts(),
+      loadPeak(period)
+    ]);
+  }
+
+  document.getElementById('dashPeriod').addEventListener('change', refreshAll);
+  document.addEventListener('DOMContentLoaded', refreshAll);
+})();
 </script>
 {% endblock %}

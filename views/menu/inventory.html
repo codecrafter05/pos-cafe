@@ -98,12 +98,47 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="delRmModal" tabindex="-1" aria-hidden="true" aria-labelledby="delRmModalLabel">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="delRmModalLabel">Delete raw material</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="delRmId" value="">
+        <p class="mb-2">Delete <strong id="delRmMatName"></strong>?</p>
+        <p class="mb-0 small text-secondary">
+          Only allowed if this material is not used in any product recipe. All stock movements and purchase rows for this material will be removed.
+        </p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger rounded-3" id="delRmConfirm">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function () {
   function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+
+  function escAttr(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
+  function apiErrText(d) {
+    if (!d || d.detail == null) return null;
+    if (typeof d.detail === 'string') return d.detail;
+    if (Array.isArray(d.detail)) {
+      return d.detail.map(function (x) { return (x && (x.msg || x.message)) || JSON.stringify(x); }).join('; ');
+    }
+    return null;
+  }
 
   async function load() {
     var res = await PodCafe.apiFetch('/api/v1/raw-materials');
@@ -120,7 +155,8 @@
         '<td class="text-end text-secondary">' + Number(r.min_stock_alert).toFixed(3) + '</td>' +
         '<td class="text-end">' + PodCafe.currency(r.cost_per_unit) + '</td>' +
         '<td class="text-end">' +
-          '<button class="btn btn-sm btn-outline-primary rounded-3 me-1 rm-adj" data-id="' + r.id + '">Adjust</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 me-1 rm-adj" data-id="' + r.id + '">Adjust</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 rm-del" data-id="' + r.id + '" data-name="' + escAttr(r.name) + '">Delete</button>' +
         '</td>';
       tb.appendChild(tr);
     });
@@ -131,6 +167,7 @@
     if (p && p.role === 'cashier') { window.location.replace('/pos'); return; }
     var mdl = new bootstrap.Modal(document.getElementById('rmModal'));
     var adjM = new bootstrap.Modal(document.getElementById('adjModal'));
+    var delRmM = new bootstrap.Modal(document.getElementById('delRmModal'));
 
     document.getElementById('rmNewBtn').addEventListener('click', function () {
       document.getElementById('rmModalTitle').textContent = 'Add material';
@@ -161,7 +198,28 @@
       load();
     });
 
+    document.getElementById('delRmConfirm').addEventListener('click', async function () {
+      var rid = document.getElementById('delRmId').value;
+      if (!rid) return;
+      var res = await PodCafe.apiFetch('/api/v1/raw-materials/' + encodeURIComponent(rid), { method: 'DELETE' });
+      if (!res.ok) {
+        var err = await res.json().catch(function () { return {}; });
+        PodCafe.toast(apiErrText(err) || 'Delete failed', 'danger');
+        return;
+      }
+      delRmM.hide();
+      PodCafe.toast('Material deleted', 'success');
+      load();
+    });
+
     document.getElementById('rmBody').addEventListener('click', function (e) {
+      var delBtn = e.target.closest('.rm-del');
+      if (delBtn) {
+        document.getElementById('delRmId').value = delBtn.getAttribute('data-id') || '';
+        document.getElementById('delRmMatName').textContent = delBtn.getAttribute('data-name') || '';
+        delRmM.show();
+        return;
+      }
       var b = e.target.closest('.rm-adj');
       if (!b) return;
       document.getElementById('adjId').value = b.getAttribute('data-id');

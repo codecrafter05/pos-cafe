@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Pod Café — Order history{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Orders</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">History</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="card rounded-4 mb-3">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small text-secondary mb-1">From</label>
+      <input type="date" class="form-control rounded-3" id="fltFrom">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary mb-1">To</label>
+      <input type="date" class="form-control rounded-3" id="fltTo">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary mb-1">Status</label>
+      <select class="form-select rounded-3" id="fltStatus">
+        <option value="">Any</option>
+        <option value="pending">pending</option>
+        <option value="preparing">preparing</option>
+        <option value="ready">ready</option>
+        <option value="delivered">delivered</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+    </div>
+    <div class="col-md-3 text-md-end">
+      <button type="button" class="btn btn-grd-primary rounded-3 px-4" id="fltApply">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="card rounded-4">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>When</th>
+            <th class="text-end">Total</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ordBody"></tbody>
+      </table>
+    </div>
+    <div class="alert alert-danger mt-3 d-none rounded-3" id="ordErr"></div>
+  </div>
+</div>
+
+<div class="modal fade" id="viewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="viewModalTitle">Order details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3 small" id="viewMeta"></div>
+        <h6 class="fw-bold mb-2">Customer</h6>
+        <p class="small mb-3 text-secondary" id="viewCustomer"></p>
+        <h6 class="fw-bold mb-2">Line items</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Unit</th><th class="text-end">Line</th></tr></thead>
+            <tbody id="viewItems"></tbody>
+          </table>
+        </div>
+        <p class="small text-secondary mt-3 mb-0" id="viewNotes"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="stModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">Update status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="stOrderId">
+        <label class="form-label">Status</label>
+        <select class="form-select rounded-3" id="stVal">
+          <option value="pending">pending</option>
+          <option value="preparing">preparing</option>
+          <option value="ready">ready</option>
+          <option value="delivered">delivered</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="stErr"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-grd-primary rounded-3" id="stSave">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+
+  function fmtWhen(iso) {
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return esc(iso);
+      return d.toLocaleString();
+    } catch (e) { return esc(iso); }
+  }
+
+  function modsHtml(mods) {
+    if (!mods || (Array.isArray(mods) && !mods.length)) return '';
+    var list = Array.isArray(mods) ? mods : [];
+    if (!list.length) return '';
+    return '<ul class="small text-secondary mb-0 ps-3">' + list.map(function (m) {
+      var g = m.group_name || m.group || '';
+      var o = m.option_name || m.option || '';
+      var ex = m.extra_price != null ? (' +' + PodCafe.currency(m.extra_price)) : '';
+      return '<li>' + esc(g) + ': ' + esc(o) + ex + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  async function openView(id) {
+    var res = await PodCafe.apiFetch('/api/v1/orders/' + encodeURIComponent(id));
+    if (!res.ok) {
+      PodCafe.toast('Could not load order', 'danger');
+      return;
+    }
+    var o = await res.json();
+    document.getElementById('viewModalTitle').textContent = 'Order #' + o.id;
+    var meta = document.getElementById('viewMeta');
+    meta.innerHTML =
+      '<div class="col-md-6"><span class="text-secondary">Created</span><div class="fw-semibold">' + fmtWhen(o.created_at) + '</div></div>' +
+      '<div class="col-md-6"><span class="text-secondary">Staff</span><div class="fw-semibold">' + esc(o.staff_username || ('#' + o.user_id)) + '</div></div>' +
+      '<div class="col-md-6 mt-2"><span class="text-secondary">Payment</span><div class="fw-semibold">' + esc(o.payment_method) + '</div></div>' +
+      '<div class="col-md-6 mt-2"><span class="text-secondary">Source</span><div class="fw-semibold">' + esc(o.source) + '</div></div>' +
+      '<div class="col-md-6 mt-2"><span class="text-secondary">Status</span><div class="fw-semibold">' + esc(o.status) + '</div></div>' +
+      '<div class="col-md-6 mt-2"><span class="text-secondary">Totals</span><div class="fw-semibold">' +
+        PodCafe.currency(o.total_amount) + ' · cost ' + PodCafe.currency(o.total_cost) + ' · profit ' + PodCafe.currency(o.profit) +
+      '</div></div>';
+    var cname = o.customer_name || '—';
+    var cphone = o.customer_phone || '—';
+    document.getElementById('viewCustomer').innerHTML =
+      '<strong>Name:</strong> ' + esc(cname) + '<br><strong>Phone:</strong> ' + esc(cphone);
+    var tb = document.getElementById('viewItems');
+    tb.innerHTML = '';
+    (o.items || []).forEach(function (it) {
+      var tr = document.createElement('tr');
+      var pname = it.product_name || ('Product #' + it.product_id);
+      var line = Number(it.unit_price) * Number(it.quantity);
+      tr.innerHTML =
+        '<td><div class="fw-semibold">' + esc(pname) + '</div>' + modsHtml(it.modifiers_snapshot) +
+        (it.notes ? '<div class="small text-secondary mt-1">' + esc(it.notes) + '</div>' : '') + '</td>' +
+        '<td class="text-center">' + it.quantity + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(it.unit_price) + '</td>' +
+        '<td class="text-end fw-semibold">' + PodCafe.currency(line) + '</td>';
+      tb.appendChild(tr);
+    });
+    var nn = document.getElementById('viewNotes');
+    if (o.notes) {
+      nn.innerHTML = '<strong>Order notes:</strong> ' + esc(o.notes);
+      nn.classList.remove('d-none');
+    } else {
+      nn.innerHTML = '';
+      nn.classList.add('d-none');
+    }
+    new bootstrap.Modal(document.getElementById('viewModal')).show();
+  }
+
+  async function load() {
+    var q = [];
+    var f = document.getElementById('fltFrom').value;
+    var t = document.getElementById('fltTo').value;
+    var st = document.getElementById('fltStatus').value;
+    if (f) q.push('date_from=' + encodeURIComponent(f));
+    if (t) q.push('date_to=' + encodeURIComponent(t));
+    if (st) q.push('status=' + encodeURIComponent(st));
+    var url = '/api/v1/orders' + (q.length ? ('?' + q.join('&')) : '');
+    var res = await PodCafe.apiFetch(url);
+    var err = document.getElementById('ordErr');
+    err.classList.add('d-none');
+    if (!res.ok) {
+      err.textContent = 'Failed to load orders';
+      err.classList.remove('d-none');
+      return;
+    }
+    var rows = await res.json();
+    var tb = document.getElementById('ordBody');
+    tb.innerHTML = '';
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var stVal = String(r.status || 'delivered').replace(/"/g, '&quot;');
+      tr.innerHTML =
+        '<td class="fw-semibold">#' + r.id + '</td>' +
+        '<td class="text-secondary small">' + fmtWhen(r.created_at) + '</td>' +
+        '<td class="text-end fw-semibold">' + PodCafe.currency(r.total_amount) + '</td>' +
+        '<td><span class="badge bg-secondary bg-opacity-10 text-secondary rounded-2">' + esc(r.status) + '</span></td>' +
+        '<td class="text-end text-nowrap">' +
+          '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 me-1 js-view" data-id="' + r.id + '" title="عرض التفاصيل">View</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 js-st" data-id="' + r.id + '" data-status="' + stVal + '">Status</button>' +
+        '</td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll('.js-st').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.getElementById('stOrderId').value = btn.getAttribute('data-id');
+        document.getElementById('stVal').value = btn.getAttribute('data-status') || 'delivered';
+        document.getElementById('stErr').classList.add('d-none');
+        new bootstrap.Modal(document.getElementById('stModal')).show();
+      });
+    });
+    tb.querySelectorAll('.js-view').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openView(btn.getAttribute('data-id'));
+      });
+    });
+  }
+
+  document.getElementById('fltApply').addEventListener('click', load);
+  document.getElementById('stSave').addEventListener('click', async function () {
+    var id = document.getElementById('stOrderId').value;
+    var st = document.getElementById('stVal').value;
+    var res = await PodCafe.apiFetch('/api/v1/orders/' + encodeURIComponent(id) + '/status', {
+      method: 'PUT',
+      body: JSON.stringify({ status: st })
+    });
+    var e = document.getElementById('stErr');
+    if (!res.ok) {
+      var d = await res.json().catch(function () { return {}; });
+      e.textContent = (d.detail && (d.detail.message || d.detail)) ? (typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail)) : 'Update failed';
+      e.classList.remove('d-none');
+      return;
+    }
+    bootstrap.Modal.getInstance(document.getElementById('stModal')).hide();
+    PodCafe.toast('Status updated', 'success');
+    load();
+  });
+
+  document.addEventListener('DOMContentLoaded', load);
+})();
+</script>
+{% endblock %}

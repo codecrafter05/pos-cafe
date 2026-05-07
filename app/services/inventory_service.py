@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.inventory_movement import InventoryMovement
 from app.models.product_recipe import ProductRecipe
+from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
 
 
@@ -105,3 +106,76 @@ def apply_sale_deduction_for_product(
             notes=f"Sale: product {product_id} × {quantity}",
         )
     return unit_cost
+
+
+def register_purchase(
+    db: Session,
+    *,
+    user_id: int,
+    raw_material_id: int,
+    quantity: Decimal,
+    unit_cost: Decimal,
+    notes: str | None = None,
+) -> Purchase:
+    if quantity <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Purchase quantity must be positive",
+        )
+    if unit_cost < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unit cost cannot be negative",
+        )
+    total_cost = quantity * unit_cost
+    note = notes or None
+    movement_note = note or f"Purchase {quantity} @ {unit_cost}"
+    rm = adjust_raw_material_stock(
+        db,
+        raw_material_id=raw_material_id,
+        quantity_delta=quantity,
+        movement_type="purchase",
+        notes=movement_note,
+    )
+    rm.cost_per_unit = unit_cost
+
+    purchase = Purchase(
+        raw_material_id=raw_material_id,
+        user_id=user_id,
+        quantity=quantity,
+        unit_cost=unit_cost,
+        total_cost=total_cost,
+        notes=note,
+    )
+    db.add(purchase)
+    db.flush()
+
+    from app.services import order_service
+
+    product_ids = (
+        db.query(ProductRecipe.product_id)
+        .filter(ProductRecipe.raw_material_id == raw_material_id)
+        .distinct()
+        .all()
+    )
+    for (pid,) in product_ids:
+        order_service.recompute_product_cost_price(db, pid)
+
+    return purchase
+
+
+def delete_purchase_record(db: Session, *, purchase_id: int) -> None:
+    pur = db.get(Purchase, purchase_id)
+    if pur is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Purchase not found",
+        )
+    adjust_raw_material_stock(
+        db,
+        raw_material_id=pur.raw_material_id,
+        quantity_delta=-pur.quantity,
+        movement_type="manual_adjustment",
+        notes=f"Reversal: deleted purchase #{pur.id}",
+    )
+    db.delete(pur)
