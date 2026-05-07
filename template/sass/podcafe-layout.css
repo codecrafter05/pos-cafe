@@ -19,3 +19,17 @@ body {
   bottom: 0 !important;
   z-index: 9;
 }
+
+/* Breadcrumb: theme used a home icon as the divider before every segment, while the first
+   item also contains a home link — duplicated 2–3×. Use a neutral divider instead. */
+.main-wrapper .main-content .page-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  font-family: inherit !important;
+  content: "/" !important;
+  padding-right: 0.5rem;
+  padding-left: 0.35rem;
+  font-size: 0.95em;
+  font-weight: 400;
+  line-height: inherit;
+  opacity: 0.45;
+  vertical-align: middle;
+}

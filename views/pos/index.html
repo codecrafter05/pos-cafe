@@ -5,6 +5,32 @@
 {% block extra_css %}
 <style>
   .pos-product .ratio img { object-fit: cover; }
+  .pos-product .ratio .material-icons-outlined { font-size: 2rem !important; }
+  .pos-product .card-body { padding: 0.5rem 0.65rem; }
+  .pos-product .card-body h6 { font-size: 0.82rem; margin-bottom: 0.1rem !important; }
+  .pos-product .card-body .small, .pos-product .card-body .fw-semibold { font-size: 0.75rem; }
+  .pos-product .card-body .fw-semibold { margin-top: 0.25rem !important; }
+  .pos-category-tiles { gap: 0.5rem; }
+  .pos-cat-tile {
+    min-height: 3rem;
+    min-width: 5.25rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.2;
+    border-width: 2px;
+    white-space: pre-line;
+    text-align: center;
+  }
+  .pos-cat-tile.is-active {
+    color: #fff;
+    background: linear-gradient(127deg, rgba(0, 140, 255, 0.95), rgba(160, 60, 220, 0.85));
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  @media (min-width: 1200px) {
+    #posCartPanel .table-responsive { max-height: 420px; }
+  }
 </style>
 {% endblock %}
 
@@ -24,47 +50,40 @@
 
 <div class="row g-3 align-items-start">
 
-  <div class="col-xl-8 col-xxl-9">
+  <div class="col-xl-7 col-xxl-8">
     <div class="card rounded-4 mb-3">
-      <div class="card-body">
-        <div class="row g-2 align-items-center">
-          <div class="col-md-6">
-            <div class="position-relative">
-              <input type="search" class="form-control rounded-5 ps-5" id="posSearch"
-                placeholder="Search menu…">
-              <span class="material-icons-outlined position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary">search</span>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <select class="form-select rounded-4" id="posCategoryFilter" aria-label="Category">
-              <option value="">All categories</option>
-            </select>
-          </div>
+      <div class="card-body py-3">
+        <div class="position-relative mb-3">
+          <input type="search" class="form-control rounded-5 ps-5" id="posSearch"
+            placeholder="Search menu…" autocomplete="off">
+          <span class="material-icons-outlined position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary">search</span>
         </div>
+        <div class="text-secondary small fw-semibold text-uppercase mb-2" style="letter-spacing:0.04em;font-size:0.7rem">Categories</div>
+        <div class="d-flex flex-wrap pos-category-tiles" id="posCategoryTiles" role="group" aria-label="Filter by category"></div>
       </div>
     </div>
 
-    <div class="row g-3" id="posProductGrid"></div>
+    <div class="row g-2 g-md-3" id="posProductGrid"></div>
   </div>
 
-  <div class="col-xl-4 col-xxl-3">
+  <div class="col-xl-5 col-xxl-4" id="posCartPanel">
     <div class="card rounded-4 shadow-sm position-sticky" style="top: 1rem;">
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <h5 class="mb-0 fw-bold">Current order</h5>
-          <span class="badge bg-primary bg-opacity-10 text-primary" id="posCartCount">0</span>
+          <h5 class="mb-0 fw-bold fs-5">Current order</h5>
+          <span class="badge bg-primary bg-opacity-10 text-primary fs-6" id="posCartCount">0</span>
         </div>
 
         <div class="mb-3">
           <label class="form-label small text-secondary mb-1">Customer (optional)</label>
-          <input type="text" class="form-control form-control-sm rounded-3" id="posCustomerName" placeholder="Name">
+          <input type="text" class="form-control rounded-3" id="posCustomerName" placeholder="Name">
         </div>
         <div class="mb-3">
-          <input type="text" class="form-control form-control-sm rounded-3" id="posCustomerPhone" placeholder="Phone">
+          <input type="text" class="form-control rounded-3" id="posCustomerPhone" placeholder="Phone">
         </div>
         <div class="mb-3">
           <label class="form-label small text-secondary mb-1">Payment</label>
-          <select class="form-select form-select-sm rounded-3" id="posPayment">
+          <select class="form-select rounded-3" id="posPayment">
             <option value="cash">Cash</option>
             <option value="card">Card</option>
             <option value="transfer">Transfer</option>
@@ -72,11 +91,11 @@
         </div>
         <div class="mb-3">
           <label class="form-label small text-secondary mb-1">Notes</label>
-          <input type="text" class="form-control form-control-sm rounded-3" id="posNotes" placeholder="e.g. less sugar">
+          <input type="text" class="form-control rounded-3" id="posNotes" placeholder="e.g. less sugar">
         </div>
 
-        <div class="table-responsive" style="max-height: 320px;">
-          <table class="table table-sm align-middle mb-0">
+        <div class="table-responsive" style="max-height: 360px;">
+          <table class="table align-middle mb-0">
             <thead>
               <tr>
                 <th>Item</th>
@@ -92,13 +111,13 @@
 
         <hr>
 
-        <div class="d-flex justify-content-between mb-1">
+        <div class="d-flex justify-content-between mb-1 align-items-baseline">
           <span class="text-secondary">Subtotal</span>
-          <strong id="posSubtotal">BHD 0.000</strong>
+          <strong class="fs-6" id="posSubtotal">BHD 0.000</strong>
         </div>
         <div class="d-grid gap-2 mt-3">
-          <button type="button" class="btn btn-grd-primary rounded-3" id="posCheckoutBtn">Complete sale</button>
-          <button type="button" class="btn btn-outline-secondary rounded-3" id="posClearBtn">Clear cart</button>
+          <button type="button" class="btn btn-grd-primary rounded-3 py-2 fs-6 fw-semibold" id="posCheckoutBtn">Complete sale</button>
+          <button type="button" class="btn btn-outline-secondary rounded-3 py-2" id="posClearBtn">Clear cart</button>
         </div>
         <div class="alert alert-success mt-3 d-none rounded-3" id="posSuccess" role="alert"></div>
         <div class="alert alert-danger mt-3 d-none rounded-3" id="posError" role="alert"></div>
@@ -130,11 +149,15 @@
 {% block extra_js %}
 <script>
 (function () {
+  var CART_STORAGE_KEY = 'podcafe_pos_cart_v1';
+  var CART_TTL_MS = 60 * 60 * 1000; /* 1 hour since last cart change */
   var products = [];
   var categories = [];
+  var selectedCategoryId = '';
   var cart = []; // { product, qty, modifiers: [{group_name, option_name, extra_price}] }
   var pendingProduct = null;
   var modModal = null;
+  var inventoryReady = false;
 
   function money(n) { return window.PodCafe ? PodCafe.currency(n) : n; }
 
@@ -144,15 +167,38 @@
     });
   }
 
-  function renderCategories() {
-    var sel = document.getElementById('posCategoryFilter');
-    sel.querySelectorAll('option:not(:first-child)').forEach(function (o) { o.remove(); });
-    categories.forEach(function (c) {
-      var o = document.createElement('option');
-      o.value = String(c.id);
-      o.textContent = c.name + (c.name_ar ? ' · ' + c.name_ar : '');
-      sel.appendChild(o);
+  function updateCategoryTileActive() {
+    document.querySelectorAll('.pos-cat-tile').forEach(function (btn) {
+      var id = btn.getAttribute('data-category-id') || '';
+      btn.classList.toggle('is-active', id === selectedCategoryId);
+      btn.setAttribute('aria-pressed', id === selectedCategoryId ? 'true' : 'false');
     });
+  }
+
+  function renderCategoryTiles() {
+    var host = document.getElementById('posCategoryTiles');
+    host.innerHTML = '';
+    function addTile(id, label) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-outline-light pos-cat-tile rounded-3';
+      btn.setAttribute('data-category-id', id);
+      btn.setAttribute('aria-pressed', id === selectedCategoryId ? 'true' : 'false');
+      btn.textContent = label;
+      if (id === selectedCategoryId) btn.classList.add('is-active');
+      host.appendChild(btn);
+    }
+    addTile('', 'All');
+    categories.forEach(function (c) {
+      var label = c.name + (c.name_ar ? '\n' + c.name_ar : '');
+      addTile(String(c.id), label);
+    });
+  }
+
+  function setCategoryFilter(id) {
+    selectedCategoryId = id === undefined || id === null ? '' : String(id);
+    updateCategoryTileActive();
+    renderGrid();
   }
 
   function categoryName(id) {
@@ -162,7 +208,7 @@
 
   function filteredProducts() {
     var q = document.getElementById('posSearch').value.trim().toLowerCase();
-    var cid = document.getElementById('posCategoryFilter').value;
+    var cid = selectedCategoryId;
     return products.filter(function (p) {
       if (!p.is_active) return false;
       if (cid && String(p.category_id) !== cid) return false;
@@ -177,7 +223,7 @@
     wrap.innerHTML = '';
     filteredProducts().forEach(function (p) {
       var col = document.createElement('div');
-      col.className = 'col-6 col-md-4 col-lg-4 col-xxl-3';
+      col.className = 'col-6 col-sm-4 col-md-3 col-lg-3 col-xl-2';
       var thumb;
       if (p.image_url) {
         thumb =
@@ -187,7 +233,7 @@
       } else {
         thumb =
           '<div class="ratio ratio-4x3 d-flex align-items-center justify-content-center bg-grd-primary">' +
-            '<span class="material-icons-outlined text-white" style="font-size:3rem">local_cafe</span>' +
+            '<span class="material-icons-outlined text-white">local_cafe</span>' +
           '</div>';
       }
       col.innerHTML =
@@ -206,6 +252,55 @@
   function cartLinePrice(line) {
     var extras = (line.modifiers || []).reduce(function (a, m) { return a + Number(m.extra_price || 0); }, 0);
     return (Number(line.product.price) + extras) * line.qty;
+  }
+
+  function persistCartToStorage() {
+    if (!inventoryReady) return;
+    try {
+      if (!cart.length) {
+        localStorage.removeItem(CART_STORAGE_KEY);
+        return;
+      }
+      var payload = {
+        savedAt: Date.now(),
+        lines: cart.map(function (line) {
+          return {
+            productId: line.product.id,
+            qty: line.qty,
+            modifiers: line.modifiers || []
+          };
+        })
+      };
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) { /* storage full / private mode */ }
+  }
+
+  function restoreCartFromStorage() {
+    try {
+      var raw = localStorage.getItem(CART_STORAGE_KEY);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (!data || typeof data.savedAt !== 'number' || !Array.isArray(data.lines)) {
+        localStorage.removeItem(CART_STORAGE_KEY);
+        return;
+      }
+      if (Date.now() - data.savedAt > CART_TTL_MS) {
+        localStorage.removeItem(CART_STORAGE_KEY);
+        return;
+      }
+      var restored = [];
+      data.lines.forEach(function (row) {
+        var pid = Number(row.productId);
+        var p = products.find(function (x) { return x.id === pid; });
+        if (!p || !p.is_active) return;
+        var qty = Math.max(1, parseInt(row.qty, 10) || 1);
+        var mods = Array.isArray(row.modifiers) ? row.modifiers : [];
+        restored.push({ product: p, qty: qty, modifiers: mods });
+      });
+      cart = restored;
+    } catch (err) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+    }
   }
 
   function renderCart() {
@@ -238,6 +333,7 @@
     document.getElementById('posSubtotal').textContent = money(sub);
     empty.classList.toggle('d-none', cart.length > 0);
     body.classList.toggle('d-none', cart.length === 0);
+    persistCartToStorage();
   }
 
   function addToCart(product, modifiers, qty) {
@@ -332,7 +428,11 @@
   });
 
   document.getElementById('posSearch').addEventListener('input', renderGrid);
-  document.getElementById('posCategoryFilter').addEventListener('change', renderGrid);
+  document.getElementById('posCategoryTiles').addEventListener('click', function (e) {
+    var btn = e.target.closest('.pos-cat-tile');
+    if (!btn) return;
+    setCategoryFilter(btn.getAttribute('data-category-id') || '');
+  });
 
   document.getElementById('posCheckoutBtn').addEventListener('click', async function () {
     var ok = document.getElementById('posSuccess');
@@ -388,7 +488,9 @@
       if (!rc.ok || !rp.ok) throw new Error('load');
       categories = await rc.json();
       products = await rp.json();
-      renderCategories();
+      inventoryReady = true;
+      restoreCartFromStorage();
+      renderCategoryTiles();
       renderGrid();
     } catch (e) {
       document.getElementById('posError').textContent = 'Could not load menu.';
