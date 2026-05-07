@@ -73,7 +73,6 @@
           <button class="btn btn-grd-primary rounded-3" type="button" id="prodSaveBtn">Save product</button>
         </div>
         <div class="alert alert-danger mt-3 d-none rounded-3" id="prodErr"></div>
-        <div class="alert alert-success mt-3 d-none rounded-3" id="prodOk"></div>
       </div>
     </div>
   </div>
@@ -224,7 +223,7 @@
       var f = document.getElementById('prodImageFile').files[0];
       var btn = document.getElementById('prodImageUploadBtn');
       if (!f) {
-        alert('Choose an image file first.');
+        PodCafe.toast('Choose an image file first.', 'warning');
         return;
       }
       if (!Number.isFinite(id) || id <= 0) {
@@ -244,12 +243,12 @@
           var msg = formatApiError(data) || raw || ('HTTP ' + res.status);
           if (res.status === 401) msg = 'Session expired — please log in again.';
           if (res.status === 403) msg = msg || 'Not allowed — only owner/manager can upload.';
-          alert(msg);
+          PodCafe.toast(msg, 'danger');
           return;
         }
         if (!data.image_url) {
           var bad = 'Upload succeeded but the server did not return an image URL.';
-          alert(bad);
+          PodCafe.toast(bad, 'danger');
           return;
         }
         revokePickPreview();
@@ -258,7 +257,7 @@
         refreshImagePreview(true);
       } catch (err) {
         var em = (err && err.message) ? err.message : String(err);
-        alert('Upload failed: ' + em);
+        PodCafe.toast('Upload failed: ' + em, 'danger');
       } finally {
         btn.textContent = prevText;
         syncImageUi();
@@ -277,13 +276,13 @@
       }
       if (url.indexOf('/static/uploads/products/') === 0 && Number.isFinite(id) && id > 0) {
         var res = await PodCafe.apiFetch('/api/v1/products/' + id + '/image', { method: 'DELETE' });
-        if (!res.ok) { alert('Could not remove file'); return; }
+        if (!res.ok) { PodCafe.toast('Could not remove file', 'danger'); return; }
       } else if (url && Number.isFinite(id) && id > 0) {
         var res2 = await PodCafe.apiFetch('/api/v1/products/' + id, {
           method: 'PUT',
           body: JSON.stringify({ image_url: null })
         });
-        if (!res2.ok) { alert('Could not clear image'); return; }
+        if (!res2.ok) { PodCafe.toast('Could not clear image', 'danger'); return; }
       }
       document.getElementById('prodStoredImageUrl').value = '';
       refreshImagePreview(false);
@@ -423,8 +422,7 @@
 
     document.getElementById('prodSaveBtn').addEventListener('click', async function () {
       var err = document.getElementById('prodErr');
-      var ok = document.getElementById('prodOk');
-      err.classList.add('d-none'); ok.classList.add('d-none');
+      err.classList.add('d-none');
       var imgUrl = document.getElementById('prodStoredImageUrl').value.trim() || null;
       var body = {
         category_id: Number(document.getElementById('prodCategory').value),
@@ -478,7 +476,7 @@
         });
         var data2 = await res2.json().catch(function () { return {}; });
         if (!res2.ok) { err.textContent = data2.detail || 'Save failed'; err.classList.remove('d-none'); return; }
-        ok.textContent = 'Product saved.'; ok.classList.remove('d-none');
+        PodCafe.toast('Product saved.', 'success');
       }
     });
 
@@ -494,17 +492,17 @@
     }
 
     document.getElementById('modSaveBtn').addEventListener('click', async function () {
-      if (isNew) { alert('Save product details first.'); return; }
+      if (isNew) { PodCafe.toast('Save product details first.', 'warning'); return; }
       var res = await PodCafe.apiFetch('/api/v1/products/' + getProductId(), {
         method: 'PUT',
         body: JSON.stringify({ modifiers: collectMods() })
       });
-      if (!res.ok) { alert('Could not save modifiers'); return; }
-      alert('Modifiers saved.');
+      if (!res.ok) { PodCafe.toast('Could not save modifiers', 'danger'); return; }
+      PodCafe.toast('Modifiers saved.', 'success');
     });
 
     document.getElementById('recSaveBtn').addEventListener('click', async function () {
-      if (isNew) { alert('Save product details first.'); return; }
+      if (isNew) { PodCafe.toast('Save product details first.', 'warning'); return; }
       var lines = [];
       document.querySelectorAll('#recRows tr').forEach(function (tr) {
         lines.push({
@@ -517,8 +515,8 @@
         method: 'POST',
         body: JSON.stringify({ lines: lines })
       });
-      if (!res.ok) { alert('Could not save recipe'); return; }
-      alert('Recipe saved.');
+      if (!res.ok) { PodCafe.toast('Could not save recipe', 'danger'); return; }
+      PodCafe.toast('Recipe saved.', 'success');
     });
   });
 })();

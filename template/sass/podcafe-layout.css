@@ -33,3 +33,14 @@ body {
   opacity: 0.45;
   vertical-align: middle;
 }
+
+.podcafe-toast-stack .toast {
+  min-width: 260px;
+  max-width: min(400px, calc(100vw - 2rem));
+}
+
+/* Top-end stack, below fixed top header (70px) */
+.podcafe-toast-stack.position-fixed {
+  top: 4.75rem !important;
+  bottom: auto !important;
+}
