@@ -1,17 +1,16 @@
-import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import router
 from app.api.v1.endpoints.web import router as web_router
-
-TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "template")
+from app.core.paths import PRODUCT_UPLOAD_DIR, STATIC_DIR, TEMPLATE_DIR
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
 
@@ -22,9 +21,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.middleware("http")
+async def no_store_api(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
+
 # Serve template assets at /assets and /sass
-app.mount("/assets", StaticFiles(directory=os.path.join(TEMPLATE_DIR, "assets")), name="assets")
-app.mount("/sass", StaticFiles(directory=os.path.join(TEMPLATE_DIR, "sass")), name="sass")
+app.mount("/assets", StaticFiles(directory=str(TEMPLATE_DIR / "assets")), name="assets")
+app.mount("/sass", StaticFiles(directory=str(TEMPLATE_DIR / "sass")), name="sass")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # API routes
 app.include_router(router)

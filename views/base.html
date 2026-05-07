@@ -21,6 +21,7 @@
   <link href="/sass/semi-dark.css" rel="stylesheet">
   <link href="/sass/bordered-theme.css" rel="stylesheet">
   <link href="/sass/responsive.css" rel="stylesheet">
+  <link href="/sass/podcafe-layout.css" rel="stylesheet">
   {% block extra_css %}{% endblock %}
 </head>
 
@@ -41,41 +42,46 @@
     <p class="mb-0">Pod Café POS © 2026</p>
   </footer>
 
-  <!-- hidden stub so main.js PerfectScrollbar calls don't crash -->
   <div class="search-content d-none"></div>
 
   <script src="/assets/js/bootstrap.bundle.min.js"></script>
   <script src="/assets/js/jquery.min.js"></script>
   <script src="/assets/plugins/perfect-scrollbar/js/perfect-scrollbar.js"></script>
   <script src="/assets/plugins/metismenu/metisMenu.min.js"></script>
-  <script src="/assets/plugins/apexchart/apexcharts.min.js"></script>
   <script src="/assets/plugins/simplebar/js/simplebar.min.js"></script>
   <script src="/assets/js/main.js"></script>
+  <script src="/static/js/app.js"></script>
 
   <script>
-    // Force MetisMenu init
     $(function () { $('#sidenav').metisMenu(); });
 
-    // Auth guard
     (function () {
-      if (!localStorage.getItem('access_token')) {
+      var token = localStorage.getItem('access_token');
+      if (!token) {
         window.location.replace('/login');
+        return;
       }
-    })();
-
-    // Decode JWT and show email
-    (function () {
-      function emailFromToken(t) {
-        try { return JSON.parse(atob(t.split('.')[1])).sub || 'Admin'; }
-        catch (e) { return 'Admin'; }
+      var payload = window.PodCafe ? PodCafe.payloadFromToken(token) : null;
+      if (!payload) {
+        window.location.replace('/login');
+        return;
       }
-      var email = emailFromToken(localStorage.getItem('access_token') || '');
+      var sub = payload.sub || 'User';
+      var role = payload.role || '';
       document.querySelectorAll('.js-user-email').forEach(function (el) {
-        el.textContent = email;
+        el.textContent = sub;
       });
+      document.querySelectorAll('.js-user-role').forEach(function (el) {
+        el.textContent = role;
+      });
+      if (role === 'cashier') {
+        document.querySelectorAll('.js-admin-only').forEach(function (el) {
+          var li = el.closest('li');
+          if (li) li.classList.add('d-none');
+        });
+      }
     })();
 
-    // Current date
     (function () {
       var el = document.getElementById('currentDate');
       if (el) el.textContent = new Date().toLocaleDateString('en-GB', {
@@ -83,7 +89,6 @@
       });
     })();
 
-    // Logout
     document.addEventListener('DOMContentLoaded', function () {
       document.querySelectorAll('.logout-link').forEach(function (el) {
         el.addEventListener('click', function (e) {

@@ -26,3 +26,30 @@ def login_page(request: Request):
 @router.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
 def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+@router.get("/pos", response_class=HTMLResponse, include_in_schema=False)
+def pos_page(request: Request):
+    return templates.TemplateResponse("pos/index.html", {"request": request})
+
+
+@router.get("/menu/categories", response_class=HTMLResponse, include_in_schema=False)
+def menu_categories_page(request: Request):
+    return templates.TemplateResponse("menu/categories.html", {"request": request})
+
+
+@router.get("/menu/products", response_class=HTMLResponse, include_in_schema=False)
+def menu_products_page(request: Request):
+    return templates.TemplateResponse("menu/products.html", {"request": request})
+
+
+@router.get("/menu/products/{product_id}", response_class=HTMLResponse, include_in_schema=False)
+def menu_product_detail_page(request: Request, product_id: int):
+    return templates.TemplateResponse(
+        "menu/product_detail.html", {"request": request, "product_id": product_id}
+    )
+
+
+@router.get("/menu/inventory", response_class=HTMLResponse, include_in_schema=False)
+def menu_inventory_page(request: Request):
+    return templates.TemplateResponse("menu/inventory.html", {"request": request})

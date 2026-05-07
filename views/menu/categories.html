@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Pod Café — Categories{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Categories</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">Categories</li>
+      </ol>
+    </nav>
+  </div>
+  <div class="ms-auto">
+    <button class="btn btn-grd-primary rounded-3 px-4" id="catNewBtn" type="button">New category</button>
+  </div>
+</div>
+
+<div class="card rounded-4">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Arabic</th>
+            <th>Sort</th>
+            <th>Active</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="catTableBody"></tbody>
+      </table>
+    </div>
+    <div class="text-secondary small py-4 text-center d-none" id="catEmpty">No categories yet.</div>
+  </div>
+</div>
+
+<div class="modal fade" id="catModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="catModalTitle">Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="catId">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input class="form-control rounded-3" id="catName" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Arabic name</label>
+          <input class="form-control rounded-3" id="catNameAr" placeholder="optional">
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Sort order</label>
+            <input type="number" class="form-control rounded-3" id="catSort" value="0">
+          </div>
+          <div class="col-6 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="catActive" checked>
+              <label class="form-check-label" for="catActive">Active</label>
+            </div>
+          </div>
+        </div>
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="catErr"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-grd-primary rounded-3" id="catSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var mdl;
+  function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+
+  async function load() {
+    var res = await PodCafe.apiFetch('/api/v1/categories');
+    if (!res.ok) return;
+    var rows = await res.json();
+    var tb = document.getElementById('catTableBody');
+    tb.innerHTML = '';
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="fw-semibold">' + esc(r.name) + '</td>' +
+        '<td class="text-secondary">' + esc(r.name_ar || '') + '</td>' +
+        '<td>' + r.sort_order + '</td>' +
+        '<td>' + (r.is_active ? '<span class="badge bg-success bg-opacity-10 text-success rounded-pill">Yes</span>' :
+          '<span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill">No</span>') + '</td>' +
+        '<td class="text-end">' +
+          '<button class="btn btn-sm btn-outline-primary rounded-3 me-1 cat-edit" data-id="' + r.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-outline-danger rounded-3 cat-del" data-id="' + r.id + '">Delete</button>' +
+        '</td>';
+      tb.appendChild(tr);
+    });
+    document.getElementById('catEmpty').classList.toggle('d-none', rows.length > 0);
+  }
+
+  function openNew() {
+    document.getElementById('catModalTitle').textContent = 'New category';
+    document.getElementById('catId').value = '';
+    document.getElementById('catName').value = '';
+    document.getElementById('catNameAr').value = '';
+    document.getElementById('catSort').value = '0';
+    document.getElementById('catActive').checked = true;
+    document.getElementById('catErr').classList.add('d-none');
+    mdl.show();
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var p = PodCafe.payloadFromToken(PodCafe.getToken());
+    if (p && p.role === 'cashier') { window.location.replace('/pos'); return; }
+    mdl = new bootstrap.Modal(document.getElementById('catModal'));
+    document.getElementById('catNewBtn').addEventListener('click', openNew);
+    document.getElementById('catTableBody').addEventListener('click', async function (e) {
+      var ed = e.target.closest('.cat-edit');
+      var del = e.target.closest('.cat-del');
+      if (ed) {
+        var id = ed.getAttribute('data-id');
+        var res = await PodCafe.apiFetch('/api/v1/categories');
+        var rows = await res.json();
+        var r = rows.find(function (x) { return String(x.id) === String(id); });
+        if (!r) return;
+        document.getElementById('catModalTitle').textContent = 'Edit category';
+        document.getElementById('catId').value = r.id;
+        document.getElementById('catName').value = r.name;
+        document.getElementById('catNameAr').value = r.name_ar || '';
+        document.getElementById('catSort').value = r.sort_order;
+        document.getElementById('catActive').checked = !!r.is_active;
+        document.getElementById('catErr').classList.add('d-none');
+        mdl.show();
+      }
+      if (del && confirm('Delete this category?')) {
+        var id2 = del.getAttribute('data-id');
+        var res2 = await PodCafe.apiFetch('/api/v1/categories/' + id2, { method: 'DELETE' });
+        if (!res2.ok) { alert('Could not delete (maybe it still has products).'); return; }
+        load();
+      }
+    });
+    document.getElementById('catSaveBtn').addEventListener('click', async function () {
+      var id = document.getElementById('catId').value;
+      var body = {
+        name: document.getElementById('catName').value.trim(),
+        name_ar: document.getElementById('catNameAr').value.trim() || null,
+        sort_order: Number(document.getElementById('catSort').value || 0),
+        is_active: document.getElementById('catActive').checked
+      };
+      var err = document.getElementById('catErr');
+      err.classList.add('d-none');
+      if (!body.name) { err.textContent = 'Name is required'; err.classList.remove('d-none'); return; }
+      var url = '/api/v1/categories';
+      var method = 'POST';
+      if (id) { url += '/' + id; method = 'PUT'; body = { name: body.name, name_ar: body.name_ar, sort_order: body.sort_order, is_active: body.is_active }; }
+      var res = await PodCafe.apiFetch(url, { method: method, body: JSON.stringify(body) });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) { err.textContent = data.detail || 'Save failed'; err.classList.remove('d-none'); return; }
+      mdl.hide();
+      load();
+    });
+    load();
+  });
+})();
+</script>
+{% endblock %}

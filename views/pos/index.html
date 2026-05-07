@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Pod Café — POS{% endblock %}
+
+{% block extra_css %}
+<style>
+  .pos-product .ratio img { object-fit: cover; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Point of sale</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">POS</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="row g-3 align-items-start">
+
+  <div class="col-xl-8 col-xxl-9">
+    <div class="card rounded-4 mb-3">
+      <div class="card-body">
+        <div class="row g-2 align-items-center">
+          <div class="col-md-6">
+            <div class="position-relative">
+              <input type="search" class="form-control rounded-5 ps-5" id="posSearch"
+                placeholder="Search menu…">
+              <span class="material-icons-outlined position-absolute top-50 start-0 translate-middle-y ms-3 text-secondary">search</span>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <select class="form-select rounded-4" id="posCategoryFilter" aria-label="Category">
+              <option value="">All categories</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3" id="posProductGrid"></div>
+  </div>
+
+  <div class="col-xl-4 col-xxl-3">
+    <div class="card rounded-4 shadow-sm position-sticky" style="top: 1rem;">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <h5 class="mb-0 fw-bold">Current order</h5>
+          <span class="badge bg-primary bg-opacity-10 text-primary" id="posCartCount">0</span>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small text-secondary mb-1">Customer (optional)</label>
+          <input type="text" class="form-control form-control-sm rounded-3" id="posCustomerName" placeholder="Name">
+        </div>
+        <div class="mb-3">
+          <input type="text" class="form-control form-control-sm rounded-3" id="posCustomerPhone" placeholder="Phone">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-secondary mb-1">Payment</label>
+          <select class="form-select form-select-sm rounded-3" id="posPayment">
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small text-secondary mb-1">Notes</label>
+          <input type="text" class="form-control form-control-sm rounded-3" id="posNotes" placeholder="e.g. less sugar">
+        </div>
+
+        <div class="table-responsive" style="max-height: 320px;">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="text-center" style="width:84px">Qty</th>
+                <th class="text-end">Price</th>
+                <th style="width:36px"></th>
+              </tr>
+            </thead>
+            <tbody id="posCartBody"></tbody>
+          </table>
+          <div class="text-secondary small px-2 py-3 d-none text-center" id="posCartEmpty">Cart is empty — tap a product to start.</div>
+        </div>
+
+        <hr>
+
+        <div class="d-flex justify-content-between mb-1">
+          <span class="text-secondary">Subtotal</span>
+          <strong id="posSubtotal">BHD 0.000</strong>
+        </div>
+        <div class="d-grid gap-2 mt-3">
+          <button type="button" class="btn btn-grd-primary rounded-3" id="posCheckoutBtn">Complete sale</button>
+          <button type="button" class="btn btn-outline-secondary rounded-3" id="posClearBtn">Clear cart</button>
+        </div>
+        <div class="alert alert-success mt-3 d-none rounded-3" id="posSuccess" role="alert"></div>
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="posError" role="alert"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modifier modal -->
+<div class="modal fade" id="posModifierModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="posModifierTitle">Customize</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2" id="posModifierBody"></div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-grd-primary rounded-3" id="posModifierAddBtn">Add to cart</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var products = [];
+  var categories = [];
+  var cart = []; // { product, qty, modifiers: [{group_name, option_name, extra_price}] }
+  var pendingProduct = null;
+  var modModal = null;
+
+  function money(n) { return window.PodCafe ? PodCafe.currency(n) : n; }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);
+    });
+  }
+
+  function renderCategories() {
+    var sel = document.getElementById('posCategoryFilter');
+    sel.querySelectorAll('option:not(:first-child)').forEach(function (o) { o.remove(); });
+    categories.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = String(c.id);
+      o.textContent = c.name + (c.name_ar ? ' · ' + c.name_ar : '');
+      sel.appendChild(o);
+    });
+  }
+
+  function categoryName(id) {
+    var c = categories.find(function (x) { return x.id === id; });
+    return c ? c.name : '';
+  }
+
+  function filteredProducts() {
+    var q = document.getElementById('posSearch').value.trim().toLowerCase();
+    var cid = document.getElementById('posCategoryFilter').value;
+    return products.filter(function (p) {
+      if (!p.is_active) return false;
+      if (cid && String(p.category_id) !== cid) return false;
+      if (!q) return true;
+      var n = (p.name + ' ' + (p.name_ar || '')).toLowerCase();
+      return n.indexOf(q) >= 0;
+    });
+  }
+
+  function renderGrid() {
+    var wrap = document.getElementById('posProductGrid');
+    wrap.innerHTML = '';
+    filteredProducts().forEach(function (p) {
+      var col = document.createElement('div');
+      col.className = 'col-6 col-md-4 col-lg-4 col-xxl-3';
+      var thumb;
+      if (p.image_url) {
+        thumb =
+          '<div class="ratio ratio-4x3 bg-dark bg-opacity-10">' +
+            '<img src="' + escapeHtml(p.image_url) + '" alt="" class="w-100 h-100">' +
+          '</div>';
+      } else {
+        thumb =
+          '<div class="ratio ratio-4x3 d-flex align-items-center justify-content-center bg-grd-primary">' +
+            '<span class="material-icons-outlined text-white" style="font-size:3rem">local_cafe</span>' +
+          '</div>';
+      }
+      col.innerHTML =
+        '<div class="card rounded-4 h-100 shadow-sm pos-product border-0 overflow-hidden" data-id="' + p.id + '" style="cursor:pointer">' +
+          thumb +
+          '<div class="card-body pt-3 pb-3">' +
+            '<h6 class="mb-1 fw-bold text-truncate">' + escapeHtml(p.name) + '</h6>' +
+            '<p class="mb-0 text-secondary small text-truncate">' + escapeHtml(categoryName(p.category_id)) + '</p>' +
+            '<p class="mb-0 mt-2 fw-semibold">' + money(p.price) + '</p>' +
+          '</div>' +
+        '</div>';
+      wrap.appendChild(col);
+    });
+  }
+
+  function cartLinePrice(line) {
+    var extras = (line.modifiers || []).reduce(function (a, m) { return a + Number(m.extra_price || 0); }, 0);
+    return (Number(line.product.price) + extras) * line.qty;
+  }
+
+  function renderCart() {
+    var body = document.getElementById('posCartBody');
+    var empty = document.getElementById('posCartEmpty');
+    body.innerHTML = '';
+    var sub = 0;
+    cart.forEach(function (line, idx) {
+      sub += cartLinePrice(line);
+      var mods = (line.modifiers || []).map(function (m) {
+        return escapeHtml(m.group_name) + ': ' + escapeHtml(m.option_name);
+      }).join(', ');
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><div class="fw-semibold small">' + escapeHtml(line.product.name) + '</div>' +
+        (mods ? '<div class="text-secondary" style="font-size:11px">' + mods + '</div>' : '') + '</td>' +
+        '<td class="text-center">' +
+          '<div class="btn-group btn-group-sm" role="group">' +
+            '<button type="button" class="btn btn-outline-secondary pos-qty" data-idx="' + idx + '" data-d="-1">−</button>' +
+            '<span class="btn btn-light disabled px-2">' + line.qty + '</span>' +
+            '<button type="button" class="btn btn-outline-secondary pos-qty" data-idx="' + idx + '" data-d="1">+</button>' +
+          '</div>' +
+        '</td>' +
+        '<td class="text-end small fw-semibold">' + money(cartLinePrice(line) / line.qty) + ' × ' + line.qty + '</td>' +
+        '<td><button type="button" class="btn btn-sm btn-outline-danger border-0 pos-remove" data-idx="' + idx + '">' +
+          '<i class="material-icons-outlined" style="font-size:18px">close</i></button></td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('posCartCount').textContent = String(cart.length);
+    document.getElementById('posSubtotal').textContent = money(sub);
+    empty.classList.toggle('d-none', cart.length > 0);
+    body.classList.toggle('d-none', cart.length === 0);
+  }
+
+  function addToCart(product, modifiers, qty) {
+    qty = qty || 1;
+    cart.push({ product: product, qty: qty, modifiers: modifiers || [] });
+    renderCart();
+  }
+
+  function openModifierModal(product) {
+    pendingProduct = product;
+    document.getElementById('posModifierTitle').textContent = product.name;
+    var body = document.getElementById('posModifierBody');
+    body.innerHTML = '';
+    if (product.image_url) {
+      var im = document.createElement('img');
+      im.src = product.image_url;
+      im.alt = '';
+      im.className = 'rounded-3 w-100 mb-3';
+      im.style.maxHeight = '140px';
+      im.style.objectFit = 'cover';
+      body.appendChild(im);
+    }
+    if (!product.modifiers || product.modifiers.length === 0) {
+      addToCart(product, [], 1);
+      return;
+    }
+    var groups = {};
+    product.modifiers.forEach(function (m) {
+      if (!groups[m.group_name]) groups[m.group_name] = [];
+      groups[m.group_name].push(m);
+    });
+    Object.keys(groups).forEach(function (gName) {
+      var wrap = document.createElement('div');
+      wrap.className = 'mb-3';
+      wrap.innerHTML = '<label class="form-label fw-semibold">' + escapeHtml(gName) + '</label>';
+      var select = document.createElement('select');
+      select.className = 'form-select rounded-3 pos-mod-select';
+      select.dataset.group = gName;
+      groups[gName].forEach(function (m) {
+        var opt = document.createElement('option');
+        opt.value = JSON.stringify({ group_name: m.group_name, option_name: m.option_name, extra_price: Number(m.extra_price) });
+        opt.textContent = m.option_name + (Number(m.extra_price) ? ' (+' + money(m.extra_price) + ')' : '');
+        select.appendChild(opt);
+      });
+      wrap.appendChild(select);
+      body.appendChild(wrap);
+    });
+    modModal.show();
+  }
+
+  document.getElementById('posProductGrid').addEventListener('click', function (e) {
+    var card = e.target.closest('.pos-product');
+    if (!card) return;
+    var id = Number(card.getAttribute('data-id'));
+    var p = products.find(function (x) { return x.id === id; });
+    if (!p) return;
+    openModifierModal(p);
+  });
+
+  document.getElementById('posCartBody').addEventListener('click', function (e) {
+    var b = e.target.closest('.pos-qty');
+    if (b) {
+      var idx = Number(b.getAttribute('data-idx'));
+      var d = Number(b.getAttribute('data-d'));
+      cart[idx].qty += d;
+      if (cart[idx].qty <= 0) cart.splice(idx, 1);
+      renderCart();
+      return;
+    }
+    var r = e.target.closest('.pos-remove');
+    if (r) {
+      cart.splice(Number(r.getAttribute('data-idx')), 1);
+      renderCart();
+    }
+  });
+
+  document.getElementById('posModifierAddBtn').addEventListener('click', function () {
+    if (!pendingProduct) return;
+    var selected = [];
+    document.querySelectorAll('.pos-mod-select').forEach(function (sel) {
+      try { selected.push(JSON.parse(sel.value)); } catch (err) {}
+    });
+    addToCart(pendingProduct, selected, 1);
+    modModal.hide();
+  });
+
+  document.getElementById('posClearBtn').addEventListener('click', function () {
+    cart = [];
+    renderCart();
+    document.getElementById('posSuccess').classList.add('d-none');
+    document.getElementById('posError').classList.add('d-none');
+  });
+
+  document.getElementById('posSearch').addEventListener('input', renderGrid);
+  document.getElementById('posCategoryFilter').addEventListener('change', renderGrid);
+
+  document.getElementById('posCheckoutBtn').addEventListener('click', async function () {
+    var ok = document.getElementById('posSuccess');
+    var bad = document.getElementById('posError');
+    ok.classList.add('d-none'); bad.classList.add('d-none');
+    if (!cart.length) {
+      bad.textContent = 'Cart is empty.'; bad.classList.remove('d-none'); return;
+    }
+    var payload = {
+      items: cart.map(function (line) {
+        return {
+          product_id: line.product.id,
+          quantity: line.qty,
+          modifiers: (line.modifiers || []).map(function (m) {
+            return { group_name: m.group_name, option_name: m.option_name, extra_price: String(m.extra_price) };
+          })
+        };
+      }),
+      customer_name: document.getElementById('posCustomerName').value.trim() || null,
+      customer_phone: document.getElementById('posCustomerPhone').value.trim() || null,
+      payment_method: document.getElementById('posPayment').value,
+      notes: document.getElementById('posNotes').value.trim() || null
+    };
+    var btn = this;
+    btn.disabled = true;
+    try {
+      var res = await PodCafe.apiFetch('/api/v1/orders', { method: 'POST', body: JSON.stringify(payload) });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        var msg = data.detail;
+        if (Array.isArray(msg)) msg = msg.map(function (x) { return x.msg; }).join(', ');
+        bad.textContent = typeof msg === 'string' ? msg : 'Could not place order.'; bad.classList.remove('d-none');
+        return;
+      }
+      ok.textContent = 'Order #' + data.id + ' completed — total ' + money(data.total_amount) + ', profit ' + money(data.profit);
+      ok.classList.remove('d-none');
+      cart = []; renderCart();
+      document.getElementById('posCustomerName').value = '';
+      document.getElementById('posCustomerPhone').value = '';
+      document.getElementById('posNotes').value = '';
+    } catch (e) {
+      bad.textContent = 'Network error.'; bad.classList.remove('d-none');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    modModal = new bootstrap.Modal(document.getElementById('posModifierModal'));
+    try {
+      var rc = await PodCafe.apiFetch('/api/v1/categories');
+      var rp = await PodCafe.apiFetch('/api/v1/products?active_only=true');
+      if (!rc.ok || !rp.ok) throw new Error('load');
+      categories = await rc.json();
+      products = await rp.json();
+      renderCategories();
+      renderGrid();
+    } catch (e) {
+      document.getElementById('posError').textContent = 'Could not load menu.';
+      document.getElementById('posError').classList.remove('d-none');
+    }
+    renderCart();
+  });
+})();
+</script>
+{% endblock %}
