@@ -1,9 +1,10 @@
 from datetime import datetime
+
 from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
-    email: str
+    username: str
     password: str
 
 
@@ -14,7 +15,9 @@ class TokenResponse(BaseModel):
 
 class UserOut(BaseModel):
     id: int
-    email: str
+    name: str
+    username: str
+    role: str
     is_active: bool
     created_at: datetime
 

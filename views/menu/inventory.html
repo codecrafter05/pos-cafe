@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Pod Café — Raw materials{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Raw materials</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">Inventory</li>
+      </ol>
+    </nav>
+  </div>
+  <div class="ms-auto">
+    <button class="btn btn-grd-primary rounded-3 px-4" type="button" id="rmNewBtn">Add material</button>
+  </div>
+</div>
+
+<div class="card rounded-4">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Unit</th>
+            <th class="text-end">On hand</th>
+            <th class="text-end">Min alert</th>
+            <th class="text-end">Cost / unit</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rmBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="rmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="rmModalTitle">Raw material</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input class="form-control rounded-3" id="rmName" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Unit (ml, g, piece…)</label>
+          <input class="form-control rounded-3" id="rmUnit" required>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Opening stock</label>
+            <input type="number" step="0.001" class="form-control rounded-3" id="rmOpen" value="0">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Min alert</label>
+            <input type="number" step="0.001" class="form-control rounded-3" id="rmMin" value="0">
+          </div>
+        </div>
+        <div class="mt-2">
+          <label class="form-label">Cost per unit</label>
+          <input type="number" step="0.001" class="form-control rounded-3" id="rmCost" value="0">
+        </div>
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="rmErr"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-grd-primary rounded-3" id="rmSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="adjModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">Adjust stock</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="adjId">
+        <label class="form-label">Quantity delta (+ / −)</label>
+        <input type="number" step="0.001" class="form-control rounded-3" id="adjDelta" value="0">
+        <label class="form-label mt-2">Notes</label>
+        <input class="form-control rounded-3" id="adjNotes" placeholder="optional">
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="adjErr"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-grd-primary rounded-3" id="adjSaveBtn">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+
+  async function load() {
+    var res = await PodCafe.apiFetch('/api/v1/raw-materials');
+    var rows = await res.json();
+    var tb = document.getElementById('rmBody');
+    tb.innerHTML = '';
+    rows.forEach(function (r) {
+      var low = Number(r.current_stock) <= Number(r.min_stock_alert);
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="fw-semibold">' + esc(r.name) + (low ? ' <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill">Low</span>' : '') + '</td>' +
+        '<td class="text-secondary">' + esc(r.unit) + '</td>' +
+        '<td class="text-end fw-semibold">' + Number(r.current_stock).toFixed(3) + '</td>' +
+        '<td class="text-end text-secondary">' + Number(r.min_stock_alert).toFixed(3) + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(r.cost_per_unit) + '</td>' +
+        '<td class="text-end">' +
+          '<button class="btn btn-sm btn-outline-primary rounded-3 me-1 rm-adj" data-id="' + r.id + '">Adjust</button>' +
+        '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var p = PodCafe.payloadFromToken(PodCafe.getToken());
+    if (p && p.role === 'cashier') { window.location.replace('/pos'); return; }
+    var mdl = new bootstrap.Modal(document.getElementById('rmModal'));
+    var adjM = new bootstrap.Modal(document.getElementById('adjModal'));
+
+    document.getElementById('rmNewBtn').addEventListener('click', function () {
+      document.getElementById('rmModalTitle').textContent = 'Add material';
+      document.getElementById('rmName').value = '';
+      document.getElementById('rmUnit').value = '';
+      document.getElementById('rmOpen').value = '0';
+      document.getElementById('rmMin').value = '0';
+      document.getElementById('rmCost').value = '0';
+      document.getElementById('rmErr').classList.add('d-none');
+      mdl.show();
+    });
+
+    document.getElementById('rmSaveBtn').addEventListener('click', async function () {
+      var err = document.getElementById('rmErr');
+      err.classList.add('d-none');
+      var body = {
+        name: document.getElementById('rmName').value.trim(),
+        unit: document.getElementById('rmUnit').value.trim(),
+        current_stock: String(document.getElementById('rmOpen').value || '0'),
+        min_stock_alert: String(document.getElementById('rmMin').value || '0'),
+        cost_per_unit: String(document.getElementById('rmCost').value || '0')
+      };
+      if (!body.name || !body.unit) { err.textContent = 'Name and unit are required'; err.classList.remove('d-none'); return; }
+      var res = await PodCafe.apiFetch('/api/v1/raw-materials', { method: 'POST', body: JSON.stringify(body) });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) { err.textContent = data.detail || 'Save failed'; err.classList.remove('d-none'); return; }
+      mdl.hide();
+      load();
+    });
+
+    document.getElementById('rmBody').addEventListener('click', function (e) {
+      var b = e.target.closest('.rm-adj');
+      if (!b) return;
+      document.getElementById('adjId').value = b.getAttribute('data-id');
+      document.getElementById('adjDelta').value = '0';
+      document.getElementById('adjNotes').value = '';
+      document.getElementById('adjErr').classList.add('d-none');
+      adjM.show();
+    });
+
+    document.getElementById('adjSaveBtn').addEventListener('click', async function () {
+      var err = document.getElementById('adjErr');
+      err.classList.add('d-none');
+      var id = document.getElementById('adjId').value;
+      var res = await PodCafe.apiFetch('/api/v1/raw-materials/' + id + '/adjust', {
+        method: 'POST',
+        body: JSON.stringify({
+          quantity_delta: String(document.getElementById('adjDelta').value || '0'),
+          notes: document.getElementById('adjNotes').value.trim() || null
+        })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) { err.textContent = data.detail || 'Adjust failed'; err.classList.remove('d-none'); return; }
+      adjM.hide();
+      load();
+    });
+
+    load();
+  });
+})();
+</script>
+{% endblock %}

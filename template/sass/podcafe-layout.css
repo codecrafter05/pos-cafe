@@ -1,0 +1,21 @@
+/* Pod Café: keep page footer at the bottom of the viewport on short pages.
+   Theme default uses position:absolute for .page-footer (bottom of short body ≠ viewport). */
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+}
+
+.main-wrapper {
+  /* Footer is 40px tall; keep content clear when scrolled / on short pages */
+  padding-bottom: 3.5rem !important;
+}
+
+.page-footer {
+  position: fixed !important;
+  bottom: 0 !important;
+  z-index: 9;
+}

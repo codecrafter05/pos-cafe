@@ -1,13 +1,15 @@
 """
-Create or update the initial admin user.
+Create or update the initial owner user (phase 1 schema: username + role).
 
 Usage:
-    ADMIN_EMAIL=admin@podcafe.local ADMIN_PASSWORD=changeme python scripts/create_admin.py
+    ADMIN_USERNAME=admin ADMIN_PASSWORD=changeme python scripts/create_admin.py
+
+Optional:
+    ADMIN_NAME="Shop Owner"
 """
 import os
 import sys
 
-# Ensure project root is on the path when run directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from dotenv import load_dotenv
@@ -18,7 +20,8 @@ from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.user import User
 
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@podcafe.local")
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_NAME = os.environ.get("ADMIN_NAME", "Administrator")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
 
 if not ADMIN_PASSWORD:
@@ -27,21 +30,25 @@ if not ADMIN_PASSWORD:
 
 db = SessionLocal()
 try:
-    user = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    user = db.query(User).filter(User.username == ADMIN_USERNAME).first()
     if user:
-        user.hashed_password = hash_password(ADMIN_PASSWORD)
+        user.password_hash = hash_password(ADMIN_PASSWORD)
+        user.name = ADMIN_NAME
+        user.role = "owner"
         user.is_active = True
         db.commit()
-        print(f"Updated existing user: {ADMIN_EMAIL}")
+        print(f"Updated owner user: {ADMIN_USERNAME}")
     else:
         user = User(
-            email=ADMIN_EMAIL,
-            hashed_password=hash_password(ADMIN_PASSWORD),
+            name=ADMIN_NAME,
+            username=ADMIN_USERNAME,
+            password_hash=hash_password(ADMIN_PASSWORD),
+            role="owner",
             is_active=True,
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-        print(f"Created admin user (id={user.id}): {ADMIN_EMAIL}")
+        print(f"Created owner user (id={user.id}): {ADMIN_USERNAME}")
 finally:
     db.close()

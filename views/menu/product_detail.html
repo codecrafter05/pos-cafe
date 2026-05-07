@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% block title %}Pod Café — Product{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Product</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item"><a href="/menu/products">Products</a></li>
+        <li class="breadcrumb-item active" aria-current="page" id="prodCrumb">Edit</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Details</h5>
+        <input type="hidden" id="prodId" value="{{ product_id | int }}">
+        <input type="hidden" id="prodStoredImageUrl" value="">
+
+        <div class="mb-4">
+          <div class="rounded-4 overflow-hidden border pos-product-photo-wrap bg-dark bg-opacity-10" style="max-height: 220px;">
+            <img id="prodImagePreview" src="" alt="" class="w-100 object-fit-cover d-none" style="max-height: 220px; min-height: 160px;">
+            <div id="prodImagePlaceholder" class="text-center py-5">
+              <span class="material-icons-outlined text-secondary" style="font-size:3.5rem">hide_image</span>
+            </div>
+          </div>
+          <input type="file" class="form-control form-control-sm rounded-3 mt-3" id="prodImageFile"
+            accept="image/jpeg,image/png,image/webp,image/gif">
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="prodImageUploadBtn" disabled>Upload photo</button>
+            <button type="button" class="btn btn-sm btn-outline-danger rounded-3" id="prodImageRemoveBtn" disabled>Remove photo</button>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Category</label>
+          <select class="form-select rounded-3" id="prodCategory"></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input class="form-control rounded-3" id="prodName">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Arabic name</label>
+          <input class="form-control rounded-3" id="prodNameAr">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Price (BHD)</label>
+          <input type="number" step="0.001" class="form-control rounded-3" id="prodPrice">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control rounded-3" id="prodDesc" rows="3"></textarea>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Sort</label>
+            <input type="number" class="form-control rounded-3" id="prodSort" value="0">
+          </div>
+          <div class="col-6 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="prodActive" checked>
+              <label class="form-check-label" for="prodActive">Active</label>
+            </div>
+          </div>
+        </div>
+        <div class="d-grid mt-3">
+          <button class="btn btn-grd-primary rounded-3" type="button" id="prodSaveBtn">Save product</button>
+        </div>
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="prodErr"></div>
+        <div class="alert alert-success mt-3 d-none rounded-3" id="prodOk"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card rounded-4 mb-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h5 class="fw-bold mb-0">Modifiers</h5>
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="modAddRow">Add option</button>
+        </div>
+        <p class="text-secondary small mb-3">Grouped options (e.g. Size → Large) with optional extra price.</p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Group</th><th>Option</th><th class="text-end">+ Price</th><th></th></tr></thead>
+            <tbody id="modRows"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-outline-secondary rounded-3 btn-sm" type="button" id="modSaveBtn">Save modifiers</button>
+      </div>
+    </div>
+    <div class="card rounded-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h5 class="fw-bold mb-0">Recipe</h5>
+          <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="recAddRow">Add line</button>
+        </div>
+        <p class="text-secondary small mb-3">Links this product to raw materials for inventory and cost.</p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Material</th><th class="text-end">Qty / unit</th><th>Unit</th><th></th></tr></thead>
+            <tbody id="recRows"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-outline-secondary rounded-3 btn-sm" type="button" id="recSaveBtn">Save recipe</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var mats = [];
+
+  function rowDelBtn(cls) {
+    return '<button type="button" class="btn btn-sm btn-outline-danger border-0 ' + cls + '"><i class="material-icons-outlined" style="font-size:18px">close</i></button>';
+  }
+
+  function getProductId() {
+    var v = parseInt(String(document.getElementById('prodId').value || ''), 10);
+    return v;
+  }
+
+  function formatApiError(data) {
+    var d = data && data.detail;
+    if (d == null) return '';
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) {
+      return d.map(function (x) {
+        if (typeof x === 'string') return x;
+        return (x && (x.msg || x.message)) || JSON.stringify(x);
+      }).join(' ');
+    }
+    return String(d);
+  }
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    var p = PodCafe.payloadFromToken(PodCafe.getToken());
+    if (p && p.role === 'cashier') { window.location.replace('/pos'); return; }
+
+    var imagePickObjectUrl = null;
+
+    function revokePickPreview() {
+      if (imagePickObjectUrl) {
+        URL.revokeObjectURL(imagePickObjectUrl);
+        imagePickObjectUrl = null;
+      }
+    }
+
+    function refreshImagePreview(cacheBust) {
+      var url = document.getElementById('prodStoredImageUrl').value.trim();
+      var img = document.getElementById('prodImagePreview');
+      var ph = document.getElementById('prodImagePlaceholder');
+      var displayUrl = url;
+      if (url && cacheBust) {
+        displayUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
+      }
+      if (displayUrl) {
+        img.onload = function () {
+          img.classList.remove('d-none');
+          ph.classList.add('d-none');
+        };
+        img.onerror = function () {
+          ph.classList.remove('d-none');
+          img.classList.add('d-none');
+        };
+        img.src = displayUrl;
+      } else {
+        img.removeAttribute('src');
+        img.classList.add('d-none');
+        ph.classList.remove('d-none');
+      }
+    }
+
+    function showPickedFilePreview(file) {
+      revokePickPreview();
+      var img = document.getElementById('prodImagePreview');
+      var ph = document.getElementById('prodImagePlaceholder');
+      if (!file) {
+        refreshImagePreview(false);
+        return;
+      }
+      imagePickObjectUrl = URL.createObjectURL(file);
+      img.onload = function () {
+        img.classList.remove('d-none');
+        ph.classList.add('d-none');
+      };
+      img.onerror = function () {
+        ph.classList.remove('d-none');
+        img.classList.add('d-none');
+      };
+      img.src = imagePickObjectUrl;
+    }
+
+    function syncImageUi() {
+      var id = getProductId();
+      var hasPid = Number.isFinite(id) && id > 0;
+      var file = document.getElementById('prodImageFile').files[0];
+      document.getElementById('prodImageUploadBtn').disabled = !hasPid || !file;
+      var hasStored = !!document.getElementById('prodStoredImageUrl').value.trim();
+      document.getElementById('prodImageRemoveBtn').disabled = !hasStored && !file;
+    }
+
+    document.getElementById('prodImageFile').addEventListener('change', function () {
+      var f = this.files[0];
+      if (f) {
+        showPickedFilePreview(f);
+      } else {
+        revokePickPreview();
+        refreshImagePreview(false);
+      }
+      syncImageUi();
+    });
+
+    document.getElementById('prodImageUploadBtn').addEventListener('click', async function () {
+      var id = getProductId();
+      var f = document.getElementById('prodImageFile').files[0];
+      var btn = document.getElementById('prodImageUploadBtn');
+      if (!f) {
+        alert('Choose an image file first.');
+        return;
+      }
+      if (!Number.isFinite(id) || id <= 0) {
+        return;
+      }
+      btn.disabled = true;
+      var prevText = btn.textContent;
+      btn.textContent = 'Uploading…';
+      try {
+        var fd = new FormData();
+        fd.append('file', f, f.name || 'photo.jpg');
+        var res = await PodCafe.apiUpload('/api/v1/products/' + id + '/image', fd);
+        var raw = await res.text();
+        var data = {};
+        try { data = JSON.parse(raw); } catch (e2) { /* ignore */ }
+        if (!res.ok) {
+          var msg = formatApiError(data) || raw || ('HTTP ' + res.status);
+          if (res.status === 401) msg = 'Session expired — please log in again.';
+          if (res.status === 403) msg = msg || 'Not allowed — only owner/manager can upload.';
+          alert(msg);
+          return;
+        }
+        if (!data.image_url) {
+          var bad = 'Upload succeeded but the server did not return an image URL.';
+          alert(bad);
+          return;
+        }
+        revokePickPreview();
+        document.getElementById('prodStoredImageUrl').value = data.image_url;
+        document.getElementById('prodImageFile').value = '';
+        refreshImagePreview(true);
+      } catch (err) {
+        var em = (err && err.message) ? err.message : String(err);
+        alert('Upload failed: ' + em);
+      } finally {
+        btn.textContent = prevText;
+        syncImageUi();
+      }
+    });
+
+    document.getElementById('prodImageRemoveBtn').addEventListener('click', async function () {
+      var id = getProductId();
+      var url = document.getElementById('prodStoredImageUrl').value.trim();
+      revokePickPreview();
+      document.getElementById('prodImageFile').value = '';
+      if (!url) {
+        refreshImagePreview(false);
+        syncImageUi();
+        return;
+      }
+      if (url.indexOf('/static/uploads/products/') === 0 && Number.isFinite(id) && id > 0) {
+        var res = await PodCafe.apiFetch('/api/v1/products/' + id + '/image', { method: 'DELETE' });
+        if (!res.ok) { alert('Could not remove file'); return; }
+      } else if (url && Number.isFinite(id) && id > 0) {
+        var res2 = await PodCafe.apiFetch('/api/v1/products/' + id, {
+          method: 'PUT',
+          body: JSON.stringify({ image_url: null })
+        });
+        if (!res2.ok) { alert('Could not clear image'); return; }
+      }
+      document.getElementById('prodStoredImageUrl').value = '';
+      refreshImagePreview(false);
+      syncImageUi();
+    });
+
+    var sel = document.getElementById('prodCategory');
+    var isNew = !Number.isFinite(getProductId()) || getProductId() <= 0;
+    document.getElementById('prodCrumb').textContent = isNew ? 'New' : 'Edit #' + getProductId();
+
+    try {
+    var rc = await PodCafe.apiFetch('/api/v1/categories');
+    if (!rc.ok) throw new Error('categories HTTP ' + rc.status);
+    var cats = await rc.json();
+    cats.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = String(c.id);
+      o.textContent = c.name;
+      sel.appendChild(o);
+    });
+
+    var rm = await PodCafe.apiFetch('/api/v1/raw-materials');
+    if (!rm.ok) throw new Error('raw-materials HTTP ' + rm.status);
+    mats = await rm.json();
+
+    if (!isNew) {
+      var rp = await PodCafe.apiFetch('/api/v1/products/' + getProductId());
+      if (!rp.ok) throw new Error('product HTTP ' + rp.status);
+      var pr = await rp.json();
+      sel.value = String(pr.category_id);
+      document.getElementById('prodName').value = pr.name;
+      document.getElementById('prodNameAr').value = pr.name_ar || '';
+      document.getElementById('prodPrice').value = pr.price;
+      document.getElementById('prodDesc').value = pr.description || '';
+      document.getElementById('prodSort').value = pr.sort_order;
+      document.getElementById('prodActive').checked = !!pr.is_active;
+      var incomingImg = pr.image_url || '';
+      var curImg = document.getElementById('prodStoredImageUrl').value.trim();
+      // Avoid wiping an in-session upload: GET can finish after POST or return a stale body.
+      if (!(curImg && !incomingImg)) {
+        document.getElementById('prodStoredImageUrl').value = incomingImg;
+      }
+      refreshImagePreview(false);
+      var modB = document.getElementById('modRows');
+      (pr.modifiers || []).forEach(function (m) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td><input class="form-control form-control-sm rounded-3 mod-g" value="' + m.group_name.replace(/"/g, '&quot;') + '"></td>' +
+          '<td><input class="form-control form-control-sm rounded-3 mod-o" value="' + m.option_name.replace(/"/g, '&quot;') + '"></td>' +
+          '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 mod-p" value="' + m.extra_price + '"></td>' +
+          '<td>' + rowDelBtn('mod-del') + '</td>';
+        modB.appendChild(tr);
+      });
+      var recB = document.getElementById('recRows');
+      (pr.recipe || []).forEach(function (r) {
+        var tr = document.createElement('tr');
+        var opts = mats.map(function (x) {
+          return '<option value="' + x.id + '"' + (x.id === r.raw_material_id ? ' selected' : '') + '>' + x.name + '</option>';
+        }).join('');
+        tr.innerHTML =
+          '<td><select class="form-select form-select-sm rounded-3 rec-m">' + opts + '</select></td>' +
+          '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 rec-q" value="' + r.quantity_used + '"></td>' +
+          '<td><input class="form-control form-control-sm rounded-3 rec-u" value="' + String(r.unit).replace(/"/g, '&quot;') + '"></td>' +
+          '<td>' + rowDelBtn('rec-del') + '</td>';
+        recB.appendChild(tr);
+      });
+    }
+    } catch (e) {
+      var errBox = document.getElementById('prodErr');
+      if (errBox) {
+        errBox.textContent = 'Could not load page data (' + (e.message || e) + '). Check network or refresh.';
+        errBox.classList.remove('d-none');
+      }
+    }
+
+    syncImageUi();
+
+    function addModRow(g, o, price) {
+      var modB = document.getElementById('modRows');
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><input class="form-control form-control-sm rounded-3 mod-g" value="' + (g || '') + '"></td>' +
+        '<td><input class="form-control form-control-sm rounded-3 mod-o" value="' + (o || '') + '"></td>' +
+        '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 mod-p" value="' + (price || 0) + '"></td>' +
+        '<td>' + rowDelBtn('mod-del') + '</td>';
+      modB.appendChild(tr);
+    }
+    function addRecRow(mid, q, u) {
+      var recB = document.getElementById('recRows');
+      if (!mats.length) return;
+      var tr = document.createElement('tr');
+      mid = mid || (mats[0] && mats[0].id);
+      var opts = mats.map(function (x) {
+        return '<option value="' + x.id + '"' + (mid && Number(mid) === x.id ? ' selected' : '') + '>' + x.name + '</option>';
+      }).join('');
+      tr.innerHTML =
+        '<td><select class="form-select form-select-sm rounded-3 rec-m">' + opts + '</select></td>' +
+        '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 rec-q" value="' + (q || 0) + '"></td>' +
+        '<td><input class="form-control form-control-sm rounded-3 rec-u" value="' + String(u || (mats[0] && mats[0].unit) || '').replace(/"/g, '&quot;') + '"></td>' +
+        '<td>' + rowDelBtn('rec-del') + '</td>';
+      recB.appendChild(tr);
+    }
+
+    document.getElementById('modAddRow').addEventListener('click', function () { addModRow('Size', 'Large', 0.100); });
+    document.getElementById('recAddRow').addEventListener('click', function () { addRecRow(mats[0] && mats[0].id, 1, mats[0] && mats[0].unit); });
+
+    document.getElementById('modRows').addEventListener('click', function (e) {
+      if (e.target.closest('.mod-del')) e.target.closest('tr').remove();
+    });
+    document.getElementById('recRows').addEventListener('click', function (e) {
+      if (e.target.closest('.rec-del')) e.target.closest('tr').remove();
+    });
+
+    /** If user chose a file but did not click "Upload photo", upload it before save. */
+    async function uploadPendingPhotoIfAny(productId) {
+      var fileInput = document.getElementById('prodImageFile');
+      var f = fileInput.files && fileInput.files[0];
+      if (!f || !Number.isFinite(productId) || productId <= 0) return;
+      var fd = new FormData();
+      fd.append('file', f, f.name || 'photo.jpg');
+      var res = await PodCafe.apiUpload('/api/v1/products/' + productId + '/image', fd);
+      var raw = await res.text();
+      var data = {};
+      try { data = JSON.parse(raw); } catch (e2) { /* ignore */ }
+      if (!res.ok) {
+        var msg = formatApiError(data) || raw || ('HTTP ' + res.status);
+        if (res.status === 403) msg = msg || 'Not allowed — only owner/manager can upload.';
+        throw new Error(msg);
+      }
+      if (!data.image_url) throw new Error('Server did not return image_url');
+      revokePickPreview();
+      document.getElementById('prodStoredImageUrl').value = data.image_url;
+      fileInput.value = '';
+      refreshImagePreview(true);
+      syncImageUi();
+    }
+
+    document.getElementById('prodSaveBtn').addEventListener('click', async function () {
+      var err = document.getElementById('prodErr');
+      var ok = document.getElementById('prodOk');
+      err.classList.add('d-none'); ok.classList.add('d-none');
+      var imgUrl = document.getElementById('prodStoredImageUrl').value.trim() || null;
+      var body = {
+        category_id: Number(document.getElementById('prodCategory').value),
+        name: document.getElementById('prodName').value.trim(),
+        name_ar: document.getElementById('prodNameAr').value.trim() || null,
+        price: String(document.getElementById('prodPrice').value || '0'),
+        description: document.getElementById('prodDesc').value.trim() || null,
+        image_url: imgUrl,
+        is_active: document.getElementById('prodActive').checked,
+        sort_order: Number(document.getElementById('prodSort').value || 0),
+        modifiers: []
+      };
+      if (!body.name) { err.textContent = 'Name required'; err.classList.remove('d-none'); return; }
+
+      if (isNew) {
+        body.modifiers = collectMods();
+        var res = await PodCafe.apiFetch('/api/v1/products', { method: 'POST', body: JSON.stringify(body) });
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) { err.textContent = data.detail || 'Save failed'; err.classList.remove('d-none'); return; }
+        var newId = data.id;
+        try {
+          await uploadPendingPhotoIfAny(newId);
+        } catch (eUp) {
+          err.textContent = 'Product saved, but photo upload failed: ' + ((eUp && eUp.message) ? eUp.message : eUp);
+          err.classList.remove('d-none');
+        }
+        window.location.href = '/menu/products/' + newId;
+      } else {
+        try {
+          await uploadPendingPhotoIfAny(getProductId());
+        } catch (eUp) {
+          err.textContent = 'Photo upload failed: ' + ((eUp && eUp.message) ? eUp.message : eUp);
+          err.classList.remove('d-none');
+          return;
+        }
+        imgUrl = document.getElementById('prodStoredImageUrl').value.trim() || null;
+        var putBody = {
+          category_id: body.category_id,
+          name: body.name,
+          name_ar: body.name_ar,
+          price: body.price,
+          description: body.description,
+          image_url: imgUrl,
+          is_active: body.is_active,
+          sort_order: body.sort_order,
+          modifiers: collectMods()
+        };
+        var res2 = await PodCafe.apiFetch('/api/v1/products/' + getProductId(), {
+          method: 'PUT',
+          body: JSON.stringify(putBody)
+        });
+        var data2 = await res2.json().catch(function () { return {}; });
+        if (!res2.ok) { err.textContent = data2.detail || 'Save failed'; err.classList.remove('d-none'); return; }
+        ok.textContent = 'Product saved.'; ok.classList.remove('d-none');
+      }
+    });
+
+    function collectMods() {
+      var out = [];
+      document.querySelectorAll('#modRows tr').forEach(function (tr) {
+        var g = tr.querySelector('.mod-g').value.trim();
+        var o = tr.querySelector('.mod-o').value.trim();
+        var p = tr.querySelector('.mod-p').value || '0';
+        if (g && o) out.push({ group_name: g, option_name: o, extra_price: String(p) });
+      });
+      return out;
+    }
+
+    document.getElementById('modSaveBtn').addEventListener('click', async function () {
+      if (isNew) { alert('Save product details first.'); return; }
+      var res = await PodCafe.apiFetch('/api/v1/products/' + getProductId(), {
+        method: 'PUT',
+        body: JSON.stringify({ modifiers: collectMods() })
+      });
+      if (!res.ok) { alert('Could not save modifiers'); return; }
+      alert('Modifiers saved.');
+    });
+
+    document.getElementById('recSaveBtn').addEventListener('click', async function () {
+      if (isNew) { alert('Save product details first.'); return; }
+      var lines = [];
+      document.querySelectorAll('#recRows tr').forEach(function (tr) {
+        lines.push({
+          raw_material_id: Number(tr.querySelector('.rec-m').value),
+          quantity_used: String(tr.querySelector('.rec-q').value || '0'),
+          unit: tr.querySelector('.rec-u').value.trim()
+        });
+      });
+      var res = await PodCafe.apiFetch('/api/v1/products/' + getProductId() + '/recipe', {
+        method: 'POST',
+        body: JSON.stringify({ lines: lines })
+      });
+      if (!res.ok) { alert('Could not save recipe'); return; }
+      alert('Recipe saved.');
+    });
+  });
+})();
+</script>
+{% endblock %}
