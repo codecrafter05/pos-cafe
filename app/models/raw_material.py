@@ -10,6 +10,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.inventory_movement import InventoryMovement
     from app.models.product_recipe import ProductRecipe
+    from app.models.purchase import Purchase
 
 
 class RawMaterial(Base):
@@ -29,3 +30,4 @@ class RawMaterial(Base):
     movements: Mapped[list["InventoryMovement"]] = relationship(
         "InventoryMovement", back_populates="raw_material"
     )
+    purchases: Mapped[list["Purchase"]] = relationship("Purchase", back_populates="raw_material")

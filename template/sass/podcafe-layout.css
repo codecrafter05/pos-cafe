@@ -19,3 +19,51 @@ body {
   bottom: 0 !important;
   z-index: 9;
 }
+
+/* Breadcrumb: theme used a home icon as the divider before every segment, while the first
+   item also contains a home link — duplicated 2–3×. Use a neutral divider instead. */
+.main-wrapper .main-content .page-breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  font-family: inherit !important;
+  content: "/" !important;
+  padding-right: 0.5rem;
+  padding-left: 0.35rem;
+  font-size: 0.95em;
+  font-weight: 400;
+  line-height: inherit;
+  opacity: 0.45;
+  vertical-align: middle;
+}
+
+.podcafe-toast-stack .toast {
+  min-width: 260px;
+  max-width: min(400px, calc(100vw - 2rem));
+}
+
+/* Top-end stack, below fixed top header (70px) */
+.podcafe-toast-stack.position-fixed {
+  top: 4.75rem !important;
+  bottom: auto !important;
+}
+
+.podcafe-theme-menu {
+  min-width: 248px;
+}
+.podcafe-theme-menu-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+.podcafe-theme-menu .btn.active {
+  color: #fff;
+  background: linear-gradient(127deg, rgba(0, 140, 255, 0.95), rgba(160, 60, 220, 0.88));
+  border-color: transparent;
+}
+
+/* `btn-grd-primary` is used without `.btn-grd`, so the template’s white label rule never applies. */
+.btn.btn-grd-primary,
+.btn.btn-grd-primary:hover,
+.btn.btn-grd-primary:focus,
+.btn.btn-grd-primary:active {
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}

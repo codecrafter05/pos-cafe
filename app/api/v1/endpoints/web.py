@@ -28,6 +28,11 @@ def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
+@router.get("/reports", response_class=HTMLResponse, include_in_schema=False)
+def reports_page(request: Request):
+    return templates.TemplateResponse("reports/index.html", {"request": request})
+
+
 @router.get("/pos", response_class=HTMLResponse, include_in_schema=False)
 def pos_page(request: Request):
     return templates.TemplateResponse("pos/index.html", {"request": request})
@@ -53,3 +58,41 @@ def menu_product_detail_page(request: Request, product_id: int):
 @router.get("/menu/inventory", response_class=HTMLResponse, include_in_schema=False)
 def menu_inventory_page(request: Request):
     return templates.TemplateResponse("menu/inventory.html", {"request": request})
+
+
+@router.get("/orders/history", response_class=HTMLResponse, include_in_schema=False)
+def orders_history_page(request: Request):
+    return templates.TemplateResponse("orders/history.html", {"request": request})
+
+
+@router.get("/orders/{order_id}/receipt", response_class=HTMLResponse, include_in_schema=False)
+def order_receipt_page(request: Request, order_id: int):
+    return templates.TemplateResponse(
+        "orders/receipt.html", {"request": request, "order_id": order_id}
+    )
+
+
+@router.get("/inventory/purchases", response_class=HTMLResponse, include_in_schema=False)
+def inventory_purchases_page(request: Request):
+    return templates.TemplateResponse("inventory/purchases.html", {"request": request})
+
+
+@router.get("/users", response_class=HTMLResponse, include_in_schema=False)
+def users_page(request: Request):
+    return templates.TemplateResponse("users/index.html", {"request": request})
+
+
+# --- Customer online store (Phase 3) — no staff login required ---
+@router.get("/store", response_class=HTMLResponse, include_in_schema=False)
+def store_menu_page(request: Request):
+    return templates.TemplateResponse("store/index.html", {"request": request})
+
+
+@router.get("/store/cart", response_class=HTMLResponse, include_in_schema=False)
+def store_cart_page(request: Request):
+    return templates.TemplateResponse("store/cart.html", {"request": request})
+
+
+@router.get("/store/confirmation", response_class=HTMLResponse, include_in_schema=False)
+def store_confirmation_page(request: Request):
+    return templates.TemplateResponse("store/confirmation.html", {"request": request})

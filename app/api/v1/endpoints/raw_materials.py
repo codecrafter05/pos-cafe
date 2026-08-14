@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.core.database import get_db
+from app.models.inventory_movement import InventoryMovement
+from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
 from app.models.user import User
 from app.schemas.menu import ManualStockAdjustRequest, RawMaterialCreate, RawMaterialOut, RawMaterialUpdate
@@ -10,14 +13,14 @@ from app.services import inventory_service
 
 router = APIRouter(prefix="/raw-materials", tags=["raw-materials"])
 
-_staff = require_roles("owner", "manager", "cashier")
+_viewers = require_roles("owner", "manager")
 _writers = require_roles("owner", "manager")
 
 
 @router.get("", response_model=list[RawMaterialOut])
 def list_raw_materials(
     db: Session = Depends(get_db),
-    _: User = Depends(_staff),
+    _: User = Depends(_viewers),
 ):
     return db.query(RawMaterial).order_by(RawMaterial.name).all()
 
@@ -97,8 +100,19 @@ def delete_raw_material(
     if rm.recipe_lines:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete material used in a product recipe.",
+            detail="Cannot delete material used in a product recipe. Remove it from all recipes first.",
         )
-    db.delete(rm)
-    db.commit()
+    try:
+        db.query(InventoryMovement).filter(InventoryMovement.raw_material_id == material_id).delete(
+            synchronize_session=False
+        )
+        db.query(Purchase).filter(Purchase.raw_material_id == material_id).delete(synchronize_session=False)
+        db.delete(rm)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete: this material is still referenced in the database.",
+        ) from None
     return None

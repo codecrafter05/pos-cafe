@@ -29,6 +29,7 @@ class OrderCreate(BaseModel):
 class OrderItemOut(BaseModel):
     id: int
     product_id: int
+    product_name: str | None = None
     quantity: int
     unit_price: Decimal
     unit_cost: Decimal
@@ -41,6 +42,7 @@ class OrderItemOut(BaseModel):
 class OrderOut(BaseModel):
     id: int
     user_id: int
+    staff_username: str | None = None
     customer_name: str | None
     customer_phone: str | None
     total_amount: Decimal

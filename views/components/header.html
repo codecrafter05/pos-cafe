@@ -15,6 +15,26 @@
 
     <ul class="navbar-nav gap-1 nav-right-links align-items-center">
 
+      <li class="nav-item dropdown js-admin-only">
+        <a href="javascript:;" id="podcafeThemeMenu" class="nav-link dropdown-toggle-nocaret"
+           data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" title="Theme & appearance">
+          <span class="material-icons-outlined">palette</span>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end shadow rounded-4 p-3 podcafe-theme-menu" aria-labelledby="podcafeThemeMenu">
+          <div class="text-secondary small fw-semibold mb-2 podcafe-theme-menu-label">Day / night</div>
+          <div class="d-flex gap-2 mb-3">
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 flex-fill text-center" data-podcafe-theme="light">Day</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 flex-fill text-center" data-podcafe-theme="dark">Night</button>
+          </div>
+          <div class="text-secondary small fw-semibold mb-2 podcafe-theme-menu-label">Color theme</div>
+          <div class="d-grid gap-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="blue-theme">Blue (default)</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="semi-dark">Semi dark</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="bodered-theme">Bordered</button>
+          </div>
+        </div>
+      </li>
+
       <!-- Notifications -->
       <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle dropdown-toggle-nocaret position-relative"

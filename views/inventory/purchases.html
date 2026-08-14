@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Pod Café — Purchases{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Inventory</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">Purchases</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="card rounded-4 mb-3 js-purch-admin">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label small text-secondary mb-1">Raw material</label>
+      <select class="form-select rounded-3" id="purMat"></select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary mb-1">Quantity</label>
+      <input type="number" step="0.001" min="0.001" class="form-control rounded-3" id="purQty" value="1">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small text-secondary mb-1">Unit cost</label>
+      <input type="number" step="0.001" min="0" class="form-control rounded-3" id="purCost" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary mb-1">Notes</label>
+      <input class="form-control rounded-3" id="purNotes" placeholder="optional">
+    </div>
+    <div class="col-md-1 text-md-end">
+      <button type="button" class="btn btn-grd-primary rounded-3" id="purSave">Add</button>
+    </div>
+  </div>
+  <div class="px-3 pb-3"><div class="alert alert-danger d-none rounded-3 mb-0" id="purErr"></div></div>
+</div>
+
+<div class="card rounded-4">
+  <div class="card-body">
+    <h5 class="fw-bold mb-3">Recent purchases</h5>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Material</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Unit</th>
+            <th class="text-end">Total</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="purBody"></tbody>
+      </table>
+    </div>
+    <div class="alert alert-secondary d-none rounded-3 mt-3 mb-0" id="purNoAccess">Purchases are available to owner and manager only.</div>
+  </div>
+</div>
+
+<div class="modal fade" id="delPurModal" tabindex="-1" aria-hidden="true" aria-labelledby="delPurModalLabel">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="delPurModalLabel">Delete purchase</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="delPurId" value="">
+        <p class="mb-0 text-secondary" id="delPurMsg"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger rounded-3" id="delPurConfirm">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var p = PodCafe.payloadFromToken(PodCafe.getToken());
+  var admin = p && (p.role === 'owner' || p.role === 'manager');
+
+  function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+
+  function apiErrText(d) {
+    if (!d || d.detail == null) return null;
+    if (typeof d.detail === 'string') return d.detail;
+    if (Array.isArray(d.detail)) {
+      return d.detail.map(function (x) { return (x && (x.msg || x.message)) || JSON.stringify(x); }).join('; ');
+    }
+    return null;
+  }
+
+  function escAttr(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
+  async function loadMaterials() {
+    var sel = document.getElementById('purMat');
+    sel.innerHTML = '';
+    if (!admin) return;
+    var res = await PodCafe.apiFetch('/api/v1/raw-materials');
+    if (!res.ok) return;
+    var rows = await res.json();
+    rows.forEach(function (r) {
+      var o = document.createElement('option');
+      o.value = r.id;
+      o.textContent = r.name + ' (' + r.unit + ')';
+      sel.appendChild(o);
+    });
+  }
+
+  async function loadPurchases() {
+    var tb = document.getElementById('purBody');
+    tb.innerHTML = '';
+    if (!admin) {
+      document.querySelector('.js-purch-admin').classList.add('d-none');
+      document.getElementById('purNoAccess').classList.remove('d-none');
+      return;
+    }
+    var res = await PodCafe.apiFetch('/api/v1/purchases');
+    if (!res.ok) {
+      var d = await res.json().catch(function () { return {}; });
+      var msg = apiErrText(d) || ('HTTP ' + res.status);
+      tb.innerHTML = '<tr><td colspan="6" class="text-danger">Could not load purchases: ' + esc(msg) + '</td></tr>';
+      return;
+    }
+    var rows = await res.json();
+    var idToName = {};
+    var rm = await PodCafe.apiFetch('/api/v1/raw-materials');
+    if (rm.ok) {
+      (await rm.json()).forEach(function (r) { idToName[r.id] = r.name; });
+    }
+    rows.forEach(function (x) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="text-secondary small">' + esc(x.purchased_at) + '</td>' +
+        '<td class="fw-semibold">' + esc(idToName[x.raw_material_id] || ('#' + x.raw_material_id)) + '</td>' +
+        '<td class="text-end">' + Number(x.quantity).toFixed(3) + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(x.unit_cost) + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(x.total_cost) + '</td>' +
+        '<td class="text-end">' +
+          '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 pur-del" data-id="' + x.id + '" data-summary="' + escAttr((idToName[x.raw_material_id] || '#' + x.raw_material_id) + ' · ' + String(x.purchased_at)) + '">Delete</button>' +
+        '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', async function () {
+    var delPurM = new bootstrap.Modal(document.getElementById('delPurModal'));
+
+    document.getElementById('purSave').addEventListener('click', async function () {
+      var err = document.getElementById('purErr');
+      err.classList.add('d-none');
+      var body = {
+        raw_material_id: Number(document.getElementById('purMat').value),
+        quantity: document.getElementById('purQty').value,
+        unit_cost: document.getElementById('purCost').value,
+        notes: document.getElementById('purNotes').value || null
+      };
+      var res = await PodCafe.apiFetch('/api/v1/purchases', { method: 'POST', body: JSON.stringify(body) });
+      if (!res.ok) {
+        var d = await res.json().catch(function () { return {}; });
+        err.textContent = apiErrText(d) || 'Save failed';
+        err.classList.remove('d-none');
+        return;
+      }
+      PodCafe.toast('Purchase recorded', 'success');
+      document.getElementById('purNotes').value = '';
+      loadPurchases();
+    });
+
+    document.getElementById('delPurConfirm').addEventListener('click', async function () {
+      var id = document.getElementById('delPurId').value;
+      if (!id) return;
+      var res = await PodCafe.apiFetch('/api/v1/purchases/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (!res.ok) {
+        var d = await res.json().catch(function () { return {}; });
+        PodCafe.toast(apiErrText(d) || 'Delete failed', 'danger');
+        return;
+      }
+      delPurM.hide();
+      PodCafe.toast('Purchase removed', 'success');
+      loadPurchases();
+    });
+
+    document.getElementById('purBody').addEventListener('click', function (e) {
+      var btn = e.target.closest('.pur-del');
+      if (!btn) return;
+      document.getElementById('delPurId').value = btn.getAttribute('data-id') || '';
+      document.getElementById('delPurMsg').innerHTML =
+        'Remove this purchase? Stock will be reduced by the purchased quantity.<br><span class="fw-semibold text-body">' +
+        esc(btn.getAttribute('data-summary') || '') + '</span>';
+      delPurM.show();
+    });
+
+    await loadMaterials();
+    await loadPurchases();
+  });
+})();
+</script>
+{% endblock %}

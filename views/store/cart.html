@@ -1,0 +1,279 @@
+{% extends "store/base_public.html" %}
+{% block title %}Cart — Pod Café{% endblock %}
+
+{% block extra_css %}
+<style>
+  .store-cart .cart-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .store-cart .table-cart td,
+  .store-cart .table-cart th {
+    padding: 0.65rem 0.5rem;
+    vertical-align: middle;
+  }
+  @media (min-width: 576px) {
+    .store-cart .table-cart td,
+    .store-cart .table-cart th {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+  }
+  .store-cart .wa-code-col {
+    flex: 0 0 25%;
+    max-width: 25%;
+    min-width: 6.25rem;
+  }
+  .store-cart .wa-num-col {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  @media (max-width: 575.98px) {
+    .store-cart .wa-code-col {
+      flex: 0 0 30%;
+      max-width: 30%;
+      min-width: 5.5rem;
+    }
+  }
+  .store-cart .fs-price-sm {
+    font-size: 0.9rem;
+  }
+  @media (min-width: 576px) {
+    .store-cart .fs-price-sm {
+      font-size: 1rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="store-cart">
+  <div class="cart-header">
+    <h1 class="h4 fw-bold mb-0">Your cart</h1>
+  </div>
+
+  <div id="emptyCart" class="alert alert-secondary rounded-3 d-none mb-0">Your cart is empty. <a href="/store">Back to menu</a></div>
+
+  <div id="cartWrap" class="d-none">
+    <div class="card rounded-4 border-0 shadow-sm mb-3 overflow-hidden">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-cart align-middle mb-0">
+            <thead class="table-light"><tr><th scope="col">Item</th><th scope="col" class="text-center" style="width:4.5rem">Qty</th><th scope="col" class="text-end d-none d-sm-table-cell">Line</th><th scope="col" class="text-end" style="width:1%"></th></tr></thead>
+            <tbody id="cartRows"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer bg-white border-0 d-flex flex-wrap justify-content-between align-items-center gap-2 px-3 py-3 rounded-bottom-4">
+        <span class="fw-semibold mb-0">Total</span>
+        <span class="fw-bold fs-5 fs-price-sm mb-0 text-nowrap" id="cartGrand"></span>
+      </div>
+    </div>
+
+    <div class="card rounded-4 border-0 shadow-sm mb-4">
+      <div class="card-body p-3 p-sm-4">
+        <h2 class="h6 fw-bold text-uppercase small text-secondary mb-3 mb-sm-4" style="letter-spacing: .06em">Checkout</h2>
+
+        <div class="mb-3 mb-sm-4">
+          <label class="form-label fw-semibold mb-1" for="custName">Name <span class="fw-normal text-secondary">(optional)</span></label>
+          <input type="text" class="form-control rounded-3" id="custName" maxlength="100" placeholder="Your name" autocomplete="name">
+        </div>
+
+        <div class="mb-3 mb-sm-4">
+          <label class="form-label fw-semibold mb-2" for="custCountry">WhatsApp <span class="text-danger">*</span></label>
+          <div class="d-flex flex-nowrap align-items-stretch rounded-3 overflow-hidden border" style="box-shadow: 0 0 0 1px var(--bs-border-color-translucent);">
+            <div class="wa-code-col border-end bg-body-secondary bg-opacity-25">
+              <label class="visually-hidden" for="custCountry">Country code</label>
+              <select class="form-select border-0 rounded-0 h-100 py-2 py-sm-3" id="custCountry" required aria-label="Country code" style="min-height: 2.75rem;">
+                <option value="BH" selected>+973</option>
+                <option value="SA">+966</option>
+                <option value="KW">+965</option>
+                <option value="AE">+971</option>
+                <option value="QA">+974</option>
+                <option value="OM">+968</option>
+              </select>
+            </div>
+            <div class="wa-num-col flex-grow-1">
+              <label class="visually-hidden" for="custPhone">Mobile number</label>
+              <input type="tel" class="form-control border-0 rounded-0 h-100 py-2 py-sm-3" id="custPhone" required placeholder="37331306" inputmode="numeric" autocomplete="tel-national" style="min-height: 2.75rem;">
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3 mb-sm-4">
+          <label class="form-label fw-semibold mb-1" for="custPay">Payment</label>
+          <select class="form-select rounded-3" id="custPay">
+            <option value="transfer">Bank transfer / card online</option>
+            <option value="cash">Cash on pickup</option>
+            <option value="card">Card on pickup</option>
+          </select>
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label fw-semibold mb-1" for="custNotes">Notes</label>
+          <input type="text" class="form-control rounded-3" id="custNotes" maxlength="500" placeholder="e.g. less sugar" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2 d-sm-flex flex-sm-row-reverse">
+      <button type="button" class="btn btn-lg btn-dark rounded-3 fw-bold flex-sm-fill" id="btnSubmit">Place order</button>
+      <a href="/store" class="btn btn-lg btn-outline-secondary rounded-3 flex-sm-fill">Continue shopping</a>
+    </div>
+    <div class="alert alert-danger mt-3 rounded-3 d-none" id="cartErr" role="alert"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function modsText(line) {
+    var m = line.modifiers || [];
+    if (!m.length) return '';
+    return (
+      '<div class="small text-secondary mt-1">' +
+      m
+        .map(function (x) {
+          return esc(x.group_name) + ': ' + esc(x.option_name);
+        })
+        .join(' · ') +
+      '</div>'
+    );
+  }
+
+  function render() {
+    var lines = PodCafeStore.getCart();
+    var empty = document.getElementById('emptyCart');
+    var wrap = document.getElementById('cartWrap');
+    if (!lines.length) {
+      empty.classList.remove('d-none');
+      wrap.classList.add('d-none');
+      return;
+    }
+    empty.classList.add('d-none');
+    wrap.classList.remove('d-none');
+    var tb = document.getElementById('cartRows');
+    tb.innerHTML = '';
+    lines.forEach(function (line, idx) {
+      var lineAmt = PodCafeStore.currencyBhd(PodCafeStore.cartLineTotal(line));
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' +
+        '<div class="fw-semibold">' +
+        esc(line.name) +
+        '</div>' +
+        modsText(line) +
+        '<div class="d-sm-none small text-secondary mt-1">' +
+        lineAmt +
+        '</div>' +
+        '</td>' +
+        '<td class="text-center px-1">' +
+        '<input type="number" min="1" class="form-control form-control-sm rounded-3 js-qty text-center" data-i="' +
+        idx +
+        '" value="' +
+        line.quantity +
+        '" aria-label="Quantity">' +
+        '</td>' +
+        '<td class="text-end fw-semibold text-nowrap d-none d-sm-table-cell">' +
+        lineAmt +
+        '</td>' +
+        '<td class="text-end ps-1">' +
+        '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 js-rm px-2" data-i="' +
+        idx +
+        '" title="Remove">×</button>' +
+        '</td>';
+      tb.appendChild(tr);
+    });
+    document.getElementById('cartGrand').textContent = PodCafeStore.currencyBhd(PodCafeStore.cartTotal(lines));
+    tb.querySelectorAll('.js-qty').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var i = parseInt(inp.getAttribute('data-i'), 10);
+        var n = parseInt(inp.value, 10) || 1;
+        if (n < 1) n = 1;
+        var c = PodCafeStore.getCart();
+        c[i].quantity = n;
+        PodCafeStore.setCart(c);
+        render();
+      });
+    });
+    tb.querySelectorAll('.js-rm').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var i = parseInt(btn.getAttribute('data-i'), 10);
+        var c = PodCafeStore.getCart();
+        c.splice(i, 1);
+        PodCafeStore.setCart(c);
+        render();
+      });
+    });
+  }
+
+  document.getElementById('btnSubmit').addEventListener('click', async function () {
+    var err = document.getElementById('cartErr');
+    err.classList.add('d-none');
+    var lines = PodCafeStore.getCart();
+    if (!lines.length) return;
+    var phone = document.getElementById('custPhone').value.trim();
+    if (phone.replace(/\D/g, '').length < 6) {
+      err.textContent = 'Please enter a valid WhatsApp number';
+      err.classList.remove('d-none');
+      return;
+    }
+    var payload = {
+      customer_name: document.getElementById('custName').value.trim() || null,
+      whatsapp_country: document.getElementById('custCountry').value,
+      whatsapp_phone: phone,
+      payment_method: document.getElementById('custPay').value,
+      notes: document.getElementById('custNotes').value.trim() || null,
+      items: lines.map(function (l) {
+        return {
+          product_id: l.product_id,
+          quantity: l.quantity,
+          modifiers: (l.modifiers || []).map(function (m) {
+            return {
+              group_name: m.group_name,
+              option_name: m.option_name,
+              extra_price: m.extra_price,
+            };
+          }),
+          notes: null,
+        };
+      }),
+    };
+    var btn = document.getElementById('btnSubmit');
+    btn.disabled = true;
+    try {
+      var res = await fetch('/api/store/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json().catch(function () {
+        return {};
+      });
+      if (!res.ok) {
+        err.textContent = (typeof data.detail === 'string' ? data.detail : null) || 'Could not place order';
+        err.classList.remove('d-none');
+        btn.disabled = false;
+        return;
+      }
+      PodCafeStore.setCart([]);
+      window.location.replace('/store/confirmation?order_id=' + encodeURIComponent(data.id));
+    } catch (e) {
+      err.textContent = 'Network error';
+      err.classList.remove('d-none');
+      btn.disabled = false;
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', render);
+})();
+</script>
+{% endblock %}

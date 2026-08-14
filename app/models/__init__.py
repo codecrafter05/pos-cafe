@@ -5,6 +5,7 @@ from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.product_modifier import ProductModifier
 from app.models.product_recipe import ProductRecipe
+from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
 from app.models.user import User
 
@@ -16,6 +17,7 @@ __all__ = [
     "Product",
     "ProductModifier",
     "ProductRecipe",
+    "Purchase",
     "RawMaterial",
     "User",
 ]

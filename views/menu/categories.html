@@ -75,12 +75,38 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="catDeleteModal" tabindex="-1" aria-labelledby="catDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0 shadow">
+      <div class="modal-header border-0 pb-0 align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <span class="rounded-circle bg-danger bg-opacity-10 text-danger d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px">
+            <span class="material-icons-outlined" style="font-size:22px;line-height:1">delete_outline</span>
+          </span>
+          <h5 class="modal-title fw-bold mb-0" id="catDeleteModalLabel">Delete category?</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <p class="text-secondary mb-0" id="catDeleteModalMsg"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0 gap-2">
+        <button type="button" class="btn btn-outline-secondary rounded-3 flex-grow-1 flex-sm-grow-0" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger rounded-3 flex-grow-1 flex-sm-grow-0" id="catDeleteConfirmBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 (function () {
   var mdl;
+  var deleteMdl;
+  var pendingDeleteId = null;
+
   function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
 
   async function load() {
@@ -121,6 +147,20 @@
     var p = PodCafe.payloadFromToken(PodCafe.getToken());
     if (p && p.role === 'cashier') { window.location.replace('/pos'); return; }
     mdl = new bootstrap.Modal(document.getElementById('catModal'));
+    deleteMdl = new bootstrap.Modal(document.getElementById('catDeleteModal'));
+    document.getElementById('catDeleteModal').addEventListener('hidden.bs.modal', function () {
+      pendingDeleteId = null;
+    });
+    document.getElementById('catDeleteConfirmBtn').addEventListener('click', async function () {
+      var id2 = pendingDeleteId;
+      if (!id2) return;
+      pendingDeleteId = null;
+      deleteMdl.hide();
+      var res2 = await PodCafe.apiFetch('/api/v1/categories/' + id2, { method: 'DELETE' });
+      if (!res2.ok) { PodCafe.toast('Could not delete (maybe it still has products).', 'danger'); return; }
+      PodCafe.toast('Category deleted.', 'success');
+      load();
+    });
     document.getElementById('catNewBtn').addEventListener('click', openNew);
     document.getElementById('catTableBody').addEventListener('click', async function (e) {
       var ed = e.target.closest('.cat-edit');
@@ -140,11 +180,17 @@
         document.getElementById('catErr').classList.add('d-none');
         mdl.show();
       }
-      if (del && confirm('Delete this category?')) {
+      if (del) {
         var id2 = del.getAttribute('data-id');
-        var res2 = await PodCafe.apiFetch('/api/v1/categories/' + id2, { method: 'DELETE' });
-        if (!res2.ok) { alert('Could not delete (maybe it still has products).'); return; }
-        load();
+        pendingDeleteId = id2;
+        var tr = del.closest('tr');
+        var nameCell = tr ? tr.querySelector('td') : null;
+        var catName = nameCell ? nameCell.textContent.trim() : '';
+        var msg = document.getElementById('catDeleteModalMsg');
+        msg.textContent = catName
+          ? 'Remove “' + catName + '”? This cannot be undone. Categories that still have products cannot be deleted.'
+          : 'Remove this category? This cannot be undone.';
+        deleteMdl.show();
       }
     });
     document.getElementById('catSaveBtn').addEventListener('click', async function () {
