@@ -101,7 +101,10 @@
       products.forEach(function (r) {
         var tr = document.createElement('tr');
         tr.innerHTML =
-          '<td><div class="fw-semibold">' + esc(r.name) + '</div>' +
+          '<td><div class="fw-semibold">' + esc(r.name) +
+          ((r.recipe && r.recipe.length) ? '' :
+            ' <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill">No recipe</span>') +
+          '</div>' +
           '<div class="text-secondary small">' + esc(r.name_ar || '') + '</div></td>' +
           '<td class="text-secondary">' + esc(cmap[r.category_id] || '') + '</td>' +
           '<td class="text-end fw-semibold">' + PodCafe.currency(r.price) + '</td>' +

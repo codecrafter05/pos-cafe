@@ -34,6 +34,37 @@ class PeakHourOut(BaseModel):
     orders: int
 
 
+class ReportDayOut(BaseModel):
+    date: str
+    label: str
+    revenue: Decimal
+    cost: Decimal
+    profit: Decimal
+    orders: int
+
+
+class ReportProductOut(BaseModel):
+    product_id: int
+    name: str
+    name_ar: str | None
+    units_sold: int
+    revenue: Decimal
+    cost: Decimal
+    profit: Decimal
+
+
+class ReportSummaryOut(BaseModel):
+    date_from: str
+    date_to: str
+    revenue: Decimal
+    total_cost: Decimal
+    net_profit: Decimal
+    orders_count: int
+    avg_order_value: Decimal
+    by_day: list[ReportDayOut]
+    by_product: list[ReportProductOut]
+
+
 class InventoryAlertOut(BaseModel):
     id: int
     name: str

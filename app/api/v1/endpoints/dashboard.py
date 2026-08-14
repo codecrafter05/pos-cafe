@@ -39,11 +39,15 @@ def summary(
 
 @router.get("/sales-chart", response_model=list[SalesChartPointOut])
 def sales_chart(
+    period: Annotated[Period, Query()] = "week",
     db: Session = Depends(get_db),
     _: User = Depends(_admin),
 ):
-    rows = dashboard_service.sales_chart_last_days(db, days=7)
-    return [SalesChartPointOut(**r) for r in rows]
+    rows = dashboard_service.sales_chart_for_period(db, period=period)
+    return [
+        SalesChartPointOut(date=r["date"], label=r["label"], revenue=r["revenue"])
+        for r in rows
+    ]
 
 
 @router.get("/top-products", response_model=list[TopProductOut])

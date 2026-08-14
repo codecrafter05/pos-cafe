@@ -21,7 +21,7 @@ class InventoryMovement(Base):
     )
     movement_type: Mapped[str] = mapped_column(
         String(30), nullable=False
-    )  # purchase | sale_deduction | manual_adjustment | waste
+    )  # purchase | sale_deduction | manual_adjustment | waste | cancellation_reversal
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     order_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True

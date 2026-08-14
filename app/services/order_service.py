@@ -97,6 +97,21 @@ def _create_order_from_items(
                 detail=f"Product {line.product_id} not available",
             )
 
+        has_recipe = (
+            db.query(ProductRecipe.id)
+            .filter(ProductRecipe.product_id == product.id)
+            .first()
+            is not None
+        )
+        if not has_recipe:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Cannot sell “{product.name}”: no recipe is configured. "
+                    "Add ingredients on the product page before selling."
+                ),
+            )
+
         extras = _extra_price_for_modifiers(db, product.id, line.modifiers)
         unit_price = product.price + extras
         line_revenue = unit_price * line.quantity

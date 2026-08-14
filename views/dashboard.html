@@ -109,7 +109,7 @@
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-3">
             <h5 class="mb-0 fw-bold">Daily revenue</h5>
-            <span class="badge bg-primary bg-opacity-10 text-primary">Last 7 days</span>
+            <span class="badge bg-primary bg-opacity-10 text-primary" id="dashChartBadge">Last 7 days</span>
           </div>
           <div id="revenueChart"></div>
         </div>
@@ -203,13 +203,17 @@
     document.getElementById('dashProfit').textContent = PodCafe.currency(d.net_profit);
   }
 
-  async function loadChart() {
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/sales-chart');
+  async function loadChart(period) {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/sales-chart?period=' + encodeURIComponent(period));
     if (!res.ok) return;
     var rows = await res.json();
     var s = rows.map(function (r) { return Number(r.revenue); });
     var lbl = rows.map(function (r) { return r.label; });
     renderChart(s, lbl);
+    var badge = document.getElementById('dashChartBadge');
+    if (badge) {
+      badge.textContent = period === 'today' ? 'Today' : (period === 'month' ? 'This month' : 'Last 7 days');
+    }
   }
 
   async function loadTop(period) {
@@ -294,7 +298,7 @@
     var period = document.getElementById('dashPeriod').value;
     await Promise.all([
       loadSummary(period),
-      loadChart(),
+      loadChart(period),
       loadTop(period),
       loadAlerts(),
       loadPeak(period)

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Pod Café — Reports{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Reports</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">Sales &amp; profit</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="card rounded-4 mb-3">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small text-secondary mb-1">From</label>
+      <input type="date" class="form-control rounded-3" id="rptFrom">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small text-secondary mb-1">To</label>
+      <input type="date" class="form-control rounded-3" id="rptTo">
+    </div>
+    <div class="col-md-6 text-md-end">
+      <button type="button" class="btn btn-grd-primary rounded-3 px-4 me-1" id="rptApply">Apply</button>
+      <button type="button" class="btn btn-outline-secondary rounded-3 px-4" id="rptCsv">Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl">
+    <div class="card rounded-4 h-100"><div class="card-body">
+      <p class="mb-1 text-secondary small">Revenue</p>
+      <h5 class="mb-0" id="rptRevenue">—</h5>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="card rounded-4 h-100"><div class="card-body">
+      <p class="mb-1 text-secondary small">Cost</p>
+      <h5 class="mb-0" id="rptCost">—</h5>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="card rounded-4 h-100"><div class="card-body">
+      <p class="mb-1 text-secondary small">Profit</p>
+      <h5 class="mb-0" id="rptProfit">—</h5>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="card rounded-4 h-100"><div class="card-body">
+      <p class="mb-1 text-secondary small">Orders</p>
+      <h5 class="mb-0" id="rptOrders">—</h5>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl">
+    <div class="card rounded-4 h-100"><div class="card-body">
+      <p class="mb-1 text-secondary small">Avg order</p>
+      <h5 class="mb-0" id="rptAvg">—</h5>
+    </div></div>
+  </div>
+</div>
+
+<div class="card rounded-4 mb-3">
+  <div class="card-body">
+    <h5 class="mb-3 fw-bold">Daily revenue</h5>
+    <div id="rptChart"></div>
+  </div>
+</div>
+
+<div class="card rounded-4">
+  <div class="card-body">
+    <h5 class="mb-3 fw-bold">Profit by product</h5>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th class="text-end">Units</th>
+            <th class="text-end">Revenue</th>
+            <th class="text-end">Cost</th>
+            <th class="text-end">Profit</th>
+          </tr>
+        </thead>
+        <tbody id="rptProdBody"></tbody>
+      </table>
+    </div>
+    <div class="alert alert-danger mt-3 d-none rounded-3" id="rptErr"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/assets/plugins/apexchart/apexcharts.min.js"></script>
+<script>
+(function () {
+  var lastReport = null;
+  var chart;
+
+  var p = PodCafe.payloadFromToken(PodCafe.getToken());
+  if (p && p.role === 'cashier') {
+    window.location.replace('/pos');
+    return;
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
+    });
+  }
+
+  function todayISO() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bahrain' });
+  }
+
+  function monthStartISO() {
+    var t = todayISO();
+    return t.slice(0, 8) + '01';
+  }
+
+  function csvCell(v) {
+    var s = String(v == null ? '' : v);
+    if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function renderChart(series, labels) {
+    var el = document.querySelector('#rptChart');
+    if (!el || typeof ApexCharts === 'undefined') return;
+    if (chart) { chart.destroy(); chart = null; }
+    chart = new ApexCharts(el, {
+      series: [{ name: 'Revenue', data: series }],
+      chart: { type: 'area', height: 220, toolbar: { show: false } },
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2 },
+      xaxis: { categories: labels },
+      yaxis: { labels: { formatter: function (v) { return Number(v).toFixed(0); } } },
+      colors: ['#0d6efd'],
+      tooltip: { y: { formatter: function (v) { return PodCafe.currency(v); } } },
+      grid: { borderColor: '#f1f1f1' }
+    });
+    chart.render();
+  }
+
+  async function load() {
+    var err = document.getElementById('rptErr');
+    err.classList.add('d-none');
+    var from = document.getElementById('rptFrom').value;
+    var to = document.getElementById('rptTo').value;
+    if (!from || !to) return;
+    var res = await PodCafe.apiFetch(
+      '/api/v1/reports/summary?date_from=' + encodeURIComponent(from) + '&date_to=' + encodeURIComponent(to)
+    );
+    if (!res.ok) {
+      var d = await res.json().catch(function () { return {}; });
+      err.textContent = (typeof d.detail === 'string' ? d.detail : 'Could not load report');
+      err.classList.remove('d-none');
+      return;
+    }
+    var data = await res.json();
+    lastReport = data;
+    document.getElementById('rptRevenue').textContent = PodCafe.currency(data.revenue);
+    document.getElementById('rptCost').textContent = PodCafe.currency(data.total_cost);
+    document.getElementById('rptProfit').textContent = PodCafe.currency(data.net_profit);
+    document.getElementById('rptOrders').textContent = String(data.orders_count);
+    document.getElementById('rptAvg').textContent = PodCafe.currency(data.avg_order_value);
+    renderChart(
+      (data.by_day || []).map(function (r) { return Number(r.revenue); }),
+      (data.by_day || []).map(function (r) { return r.label; })
+    );
+    var tb = document.getElementById('rptProdBody');
+    tb.innerHTML = '';
+    if (!(data.by_product || []).length) {
+      tb.innerHTML = '<tr><td colspan="5" class="text-secondary small">No sales in this range</td></tr>';
+      return;
+    }
+    data.by_product.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="fw-semibold">' + esc(r.name) + '</td>' +
+        '<td class="text-end">' + r.units_sold + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(r.revenue) + '</td>' +
+        '<td class="text-end text-secondary">' + PodCafe.currency(r.cost) + '</td>' +
+        '<td class="text-end fw-semibold">' + PodCafe.currency(r.profit) + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  document.getElementById('rptApply').addEventListener('click', load);
+  document.getElementById('rptCsv').addEventListener('click', function () {
+    if (!lastReport) { PodCafe.toast('Load a report first', 'warning'); return; }
+    var lines = [];
+    lines.push('Summary');
+    lines.push(['from', 'to', 'revenue', 'cost', 'profit', 'orders', 'avg_order'].join(','));
+    lines.push([
+      lastReport.date_from, lastReport.date_to,
+      lastReport.revenue, lastReport.total_cost, lastReport.net_profit,
+      lastReport.orders_count, lastReport.avg_order_value
+    ].map(csvCell).join(','));
+    lines.push('');
+    lines.push('By day');
+    lines.push(['date', 'revenue', 'cost', 'profit', 'orders'].join(','));
+    (lastReport.by_day || []).forEach(function (r) {
+      lines.push([r.date, r.revenue, r.cost, r.profit, r.orders].map(csvCell).join(','));
+    });
+    lines.push('');
+    lines.push('By product');
+    lines.push(['product', 'units', 'revenue', 'cost', 'profit'].join(','));
+    (lastReport.by_product || []).forEach(function (r) {
+      lines.push([r.name, r.units_sold, r.revenue, r.cost, r.profit].map(csvCell).join(','));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sales-report-' + lastReport.date_from + '-to-' + lastReport.date_to + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('rptFrom').value = monthStartISO();
+    document.getElementById('rptTo').value = todayISO();
+    load();
+  });
+})();
+</script>
+{% endblock %}

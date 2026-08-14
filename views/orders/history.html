@@ -82,6 +82,9 @@
         </div>
         <p class="small text-secondary mt-3 mb-0" id="viewNotes"></p>
       </div>
+      <div class="modal-footer border-0 pt-0">
+        <a class="btn btn-outline-dark rounded-3" id="viewPrintBtn" href="#" target="_blank" rel="noopener">Print Receipt</a>
+      </div>
     </div>
   </div>
 </div>
@@ -182,6 +185,7 @@
       nn.innerHTML = '';
       nn.classList.add('d-none');
     }
+    document.getElementById('viewPrintBtn').href = '/orders/' + encodeURIComponent(o.id) + '/receipt';
     new bootstrap.Modal(document.getElementById('viewModal')).show();
   }
 

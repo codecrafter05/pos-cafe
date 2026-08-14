@@ -28,6 +28,11 @@ def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
+@router.get("/reports", response_class=HTMLResponse, include_in_schema=False)
+def reports_page(request: Request):
+    return templates.TemplateResponse("reports/index.html", {"request": request})
+
+
 @router.get("/pos", response_class=HTMLResponse, include_in_schema=False)
 def pos_page(request: Request):
     return templates.TemplateResponse("pos/index.html", {"request": request})
@@ -58,6 +63,13 @@ def menu_inventory_page(request: Request):
 @router.get("/orders/history", response_class=HTMLResponse, include_in_schema=False)
 def orders_history_page(request: Request):
     return templates.TemplateResponse("orders/history.html", {"request": request})
+
+
+@router.get("/orders/{order_id}/receipt", response_class=HTMLResponse, include_in_schema=False)
+def order_receipt_page(request: Request, order_id: int):
+    return templates.TemplateResponse(
+        "orders/receipt.html", {"request": request, "order_id": order_id}
+    )
 
 
 @router.get("/inventory/purchases", response_class=HTMLResponse, include_in_schema=False)

@@ -53,8 +53,9 @@
           <label class="form-label">Unit (ml, g, piece…)</label>
           <input class="form-control rounded-3" id="rmUnit" required>
         </div>
+        <input type="hidden" id="rmId" value="">
         <div class="row g-2">
-          <div class="col-6">
+          <div class="col-6" id="rmOpenWrap">
             <label class="form-label">Opening stock</label>
             <input type="number" step="0.001" class="form-control rounded-3" id="rmOpen" value="0">
           </div>
@@ -155,6 +156,10 @@
         '<td class="text-end text-secondary">' + Number(r.min_stock_alert).toFixed(3) + '</td>' +
         '<td class="text-end">' + PodCafe.currency(r.cost_per_unit) + '</td>' +
         '<td class="text-end">' +
+          '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 me-1 rm-edit" data-id="' + r.id +
+            '" data-name="' + escAttr(r.name) + '" data-unit="' + escAttr(r.unit) +
+            '" data-min="' + escAttr(r.min_stock_alert) + '" data-cost="' + escAttr(r.cost_per_unit) +
+            '">Edit</button>' +
           '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 me-1 rm-adj" data-id="' + r.id + '">Adjust</button>' +
           '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 rm-del" data-id="' + r.id + '" data-name="' + escAttr(r.name) + '">Delete</button>' +
         '</td>';
@@ -171,11 +176,13 @@
 
     document.getElementById('rmNewBtn').addEventListener('click', function () {
       document.getElementById('rmModalTitle').textContent = 'Add material';
+      document.getElementById('rmId').value = '';
       document.getElementById('rmName').value = '';
       document.getElementById('rmUnit').value = '';
       document.getElementById('rmOpen').value = '0';
       document.getElementById('rmMin').value = '0';
       document.getElementById('rmCost').value = '0';
+      document.getElementById('rmOpenWrap').classList.remove('d-none');
       document.getElementById('rmErr').classList.add('d-none');
       mdl.show();
     });
@@ -183,17 +190,35 @@
     document.getElementById('rmSaveBtn').addEventListener('click', async function () {
       var err = document.getElementById('rmErr');
       err.classList.add('d-none');
-      var body = {
-        name: document.getElementById('rmName').value.trim(),
-        unit: document.getElementById('rmUnit').value.trim(),
-        current_stock: String(document.getElementById('rmOpen').value || '0'),
-        min_stock_alert: String(document.getElementById('rmMin').value || '0'),
-        cost_per_unit: String(document.getElementById('rmCost').value || '0')
-      };
-      if (!body.name || !body.unit) { err.textContent = 'Name and unit are required'; err.classList.remove('d-none'); return; }
-      var res = await PodCafe.apiFetch('/api/v1/raw-materials', { method: 'POST', body: JSON.stringify(body) });
+      var name = document.getElementById('rmName').value.trim();
+      var unit = document.getElementById('rmUnit').value.trim();
+      if (!name || !unit) { err.textContent = 'Name and unit are required'; err.classList.remove('d-none'); return; }
+      var editId = document.getElementById('rmId').value;
+      var res;
+      if (editId) {
+        res = await PodCafe.apiFetch('/api/v1/raw-materials/' + encodeURIComponent(editId), {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: name,
+            unit: unit,
+            min_stock_alert: String(document.getElementById('rmMin').value || '0'),
+            cost_per_unit: String(document.getElementById('rmCost').value || '0')
+          })
+        });
+      } else {
+        res = await PodCafe.apiFetch('/api/v1/raw-materials', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: name,
+            unit: unit,
+            current_stock: String(document.getElementById('rmOpen').value || '0'),
+            min_stock_alert: String(document.getElementById('rmMin').value || '0'),
+            cost_per_unit: String(document.getElementById('rmCost').value || '0')
+          })
+        });
+      }
       var data = await res.json().catch(function () { return {}; });
-      if (!res.ok) { err.textContent = data.detail || 'Save failed'; err.classList.remove('d-none'); return; }
+      if (!res.ok) { err.textContent = apiErrText(data) || data.detail || 'Save failed'; err.classList.remove('d-none'); return; }
       mdl.hide();
       load();
     });
@@ -218,6 +243,19 @@
         document.getElementById('delRmId').value = delBtn.getAttribute('data-id') || '';
         document.getElementById('delRmMatName').textContent = delBtn.getAttribute('data-name') || '';
         delRmM.show();
+        return;
+      }
+      var editBtn = e.target.closest('.rm-edit');
+      if (editBtn) {
+        document.getElementById('rmModalTitle').textContent = 'Edit material';
+        document.getElementById('rmId').value = editBtn.getAttribute('data-id') || '';
+        document.getElementById('rmName').value = editBtn.getAttribute('data-name') || '';
+        document.getElementById('rmUnit').value = editBtn.getAttribute('data-unit') || '';
+        document.getElementById('rmMin').value = editBtn.getAttribute('data-min') || '0';
+        document.getElementById('rmCost').value = editBtn.getAttribute('data-cost') || '0';
+        document.getElementById('rmOpenWrap').classList.add('d-none');
+        document.getElementById('rmErr').classList.add('d-none');
+        mdl.show();
         return;
       }
       var b = e.target.closest('.rm-adj');

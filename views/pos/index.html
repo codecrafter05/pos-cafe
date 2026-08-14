@@ -129,6 +129,7 @@
           <button type="button" class="btn btn-outline-secondary rounded-3 py-2" id="posClearBtn">Clear cart</button>
         </div>
         <div class="alert alert-success mt-3 d-none rounded-3" id="posSuccess" role="alert"></div>
+        <button type="button" class="btn btn-outline-dark rounded-3 w-100 d-none mt-2" id="posPrintBtn">Print Receipt</button>
         <div class="alert alert-danger mt-3 d-none rounded-3" id="posError" role="alert"></div>
       </div>
     </div>
@@ -434,6 +435,7 @@
     renderCart();
     document.getElementById('posSuccess').classList.add('d-none');
     document.getElementById('posError').classList.add('d-none');
+    document.getElementById('posPrintBtn').classList.add('d-none');
   });
 
   document.getElementById('posSearch').addEventListener('input', renderGrid);
@@ -447,6 +449,7 @@
     var ok = document.getElementById('posSuccess');
     var bad = document.getElementById('posError');
     ok.classList.add('d-none'); bad.classList.add('d-none');
+    document.getElementById('posPrintBtn').classList.add('d-none');
     if (!cart.length) {
       bad.textContent = 'Cart is empty.'; bad.classList.remove('d-none'); return;
     }
@@ -476,8 +479,19 @@
         bad.textContent = typeof msg === 'string' ? msg : 'Could not place order.'; bad.classList.remove('d-none');
         return;
       }
-      ok.textContent = 'Order #' + data.id + ' completed — total ' + money(data.total_amount) + ', profit ' + money(data.profit);
+      var rolePay = PodCafe.payloadFromToken(PodCafe.getToken());
+      if (rolePay && rolePay.role === 'cashier') {
+        ok.textContent = 'Order #' + data.id + ' completed — total ' + money(data.total_amount);
+      } else {
+        ok.textContent = 'Order #' + data.id + ' completed — total ' + money(data.total_amount) +
+          ', profit ' + money(data.profit);
+      }
       ok.classList.remove('d-none');
+      var printBtn = document.getElementById('posPrintBtn');
+      printBtn.classList.remove('d-none');
+      printBtn.onclick = function () {
+        window.open('/orders/' + data.id + '/receipt', '_blank', 'noopener');
+      };
       cart = []; renderCart();
       document.getElementById('posCustomerName').value = '';
       document.getElementById('posCustomerPhone').value = '';

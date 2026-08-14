@@ -108,6 +108,46 @@ def apply_sale_deduction_for_product(
     return unit_cost
 
 
+def reverse_sale_deductions_for_order(db: Session, *, order_id: int) -> None:
+    """Restore stock for a cancelled order.
+
+    Reverses the original ``sale_deduction`` movements (not the current recipe),
+    so later recipe edits do not change what is put back. Idempotent: if any
+    ``cancellation_reversal`` row already exists for this order, this is a no-op.
+    """
+    already = (
+        db.query(InventoryMovement.id)
+        .filter(
+            InventoryMovement.order_id == order_id,
+            InventoryMovement.movement_type == "cancellation_reversal",
+        )
+        .first()
+    )
+    if already is not None:
+        return
+
+    deductions = (
+        db.query(InventoryMovement)
+        .filter(
+            InventoryMovement.order_id == order_id,
+            InventoryMovement.movement_type == "sale_deduction",
+        )
+        .all()
+    )
+    for mov in deductions:
+        restore_qty = -mov.quantity
+        if restore_qty == 0:
+            continue
+        adjust_raw_material_stock(
+            db,
+            raw_material_id=mov.raw_material_id,
+            quantity_delta=restore_qty,
+            movement_type="cancellation_reversal",
+            order_id=order_id,
+            notes=f"Cancellation of order #{order_id} (reverses movement #{mov.id})",
+        )
+
+
 def register_purchase(
     db: Session,
     *,

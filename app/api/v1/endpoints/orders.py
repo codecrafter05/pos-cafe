@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timezone
+from datetime import date
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_roles
 from app.core.database import get_db
+from app.core.time import bahrain_range_utc
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.user import User
 from app.schemas.dashboard import OrderStatusUpdate
 from app.schemas.orders import OrderCreate, OrderItemOut, OrderOut
-from app.services import order_service, whatsapp_service
+from app.services import inventory_service, order_service, whatsapp_service
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +49,11 @@ def list_orders(
     q = db.query(Order).options(joinedload(Order.items))
     if user.role == "cashier":
         q = q.filter(or_(Order.user_id == user.id, Order.source == "online"))
-    if date_from is not None:
-        start = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
-        q = q.filter(Order.created_at >= start)
-    if date_to is not None:
-        end = datetime.combine(date_to, time(23, 59, 59, 999999), tzinfo=timezone.utc)
-        q = q.filter(Order.created_at <= end)
+    if date_from is not None or date_to is not None:
+        start_d = date_from or date_to
+        end_d = date_to or date_from
+        start, end = bahrain_range_utc(start_d, end_d)
+        q = q.filter(Order.created_at >= start, Order.created_at < end)
     if status_filter:
         q = q.filter(Order.status == status_filter)
     return q.order_by(Order.created_at.desc()).limit(500).all()
@@ -94,6 +94,12 @@ def update_order_status(
     if user.role == "cashier" and order.user_id != user.id and order.source != "online":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     old_status = order.status
+    if body.status == "cancelled" and old_status != "cancelled":
+        try:
+            inventory_service.reverse_sale_deductions_for_order(db, order_id=order.id)
+        except Exception:
+            db.rollback()
+            raise
     order.status = body.status
     db.commit()
     if (
