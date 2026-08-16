@@ -13,7 +13,7 @@
     } catch (e) {}
   })();
   </script>
-  <title>POS Café — Login</title>
+  <title>{{ shop.cafe_name }} — Login</title>
   <link rel="icon" href="/assets/images/favicon-32x32.png" type="image/png">
   <link href="/assets/css/pace.min.css" rel="stylesheet">
   <script src="/assets/js/pace.min.js"></script>
@@ -39,7 +39,10 @@
         <!-- Left: Form -->
         <div class="col-lg-6 d-flex">
           <div class="card-body">
-            <h3 class="fw-bold mb-1">☕ POS Café</h3>
+            {% if shop.logo_url %}
+            <img src="{{ shop.logo_url }}" alt="{{ shop.cafe_name }}" class="mb-3" style="max-height:56px;max-width:160px;object-fit:contain;">
+            {% endif %}
+            <h3 class="fw-bold mb-1">{{ shop.cafe_name }}</h3>
             <h5 class="fw-bold mt-3">Sign In</h5>
             <p class="mb-0 text-secondary">Sign in with your staff username</p>
 

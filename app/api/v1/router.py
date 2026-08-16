@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     purchases,
     raw_materials,
     reports,
+    settings,
     users,
 )
 
@@ -26,3 +27,4 @@ router.include_router(inventory.router)
 router.include_router(purchases.router)
 router.include_router(orders.router)
 router.include_router(users.router)
+router.include_router(settings.router)

@@ -7,3 +7,4 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 STATIC_DIR = PROJECT_ROOT / "static"
 TEMPLATE_DIR = PROJECT_ROOT / "template"
 PRODUCT_UPLOAD_DIR = STATIC_DIR / "uploads" / "products"
+SETTINGS_UPLOAD_DIR = STATIC_DIR / "uploads" / "settings"
