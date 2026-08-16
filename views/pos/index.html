@@ -38,7 +38,13 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
   @media (min-width: 1200px) {
-    #posCartPanel .table-responsive { max-height: 420px; }
+    #posCartPanel .pos-cart-card {
+      position: sticky;
+      top: calc(70px + 1rem);
+      max-height: calc(100vh - 70px - 3.5rem);
+      overflow-y: auto;
+    }
+    #posCartPanel .table-responsive { max-height: none; }
   }
 </style>
 {% endblock %}
@@ -57,7 +63,7 @@
   </div>
 </div>
 
-<div class="row g-3 align-items-start">
+<div class="row g-3">
 
   <div class="col-xl-7 col-xxl-8">
     <div class="card rounded-4 mb-3">
@@ -76,7 +82,7 @@
   </div>
 
   <div class="col-xl-5 col-xxl-4" id="posCartPanel">
-    <div class="card rounded-4 shadow-sm position-sticky" style="top: 1rem;">
+    <div class="card rounded-4 shadow-sm pos-cart-card">
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h5 class="mb-0 fw-bold fs-5">Current order</h5>

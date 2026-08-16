@@ -130,7 +130,7 @@
   var VALID_THEMES = ['blue-theme', 'light', 'dark', 'semi-dark', 'bodered-theme'];
 
   function normalizeTheme(name) {
-    return VALID_THEMES.indexOf(name) >= 0 ? name : 'blue-theme';
+    return VALID_THEMES.indexOf(name) >= 0 ? name : 'semi-dark';
   }
 
   function getTheme() {
