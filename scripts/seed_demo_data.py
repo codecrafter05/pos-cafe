@@ -1,17 +1,16 @@
 """
-Wipe POS demo data (orders, purchases, movements, menu, inventory) and refill
-with consistent categories, raw materials, products, recipes, and modifiers.
+Additive seed for this coffee shop's real menu.
 
-Keeps users unchanged (log in with your existing account).
+Creates missing raw materials, categories, products, and recipe lines only.
+Does not delete or update existing rows (users, orders, or already-seeded menu).
 
 Usage:
-    cd "pos cafe"
+    cd /var/www/pos
+    source .venv/bin/activate
     python scripts/seed_demo_data.py
-    python scripts/seed_demo_data.py --yes   # non-interactive confirm
 """
 from __future__ import annotations
 
-import argparse
 import os
 import sys
 from datetime import datetime, timezone
@@ -23,535 +22,423 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from sqlalchemy import delete
-
 from app.core.database import SessionLocal
 from app.models.category import Category
-from app.models.inventory_movement import InventoryMovement
-from app.models.order import Order
-from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.models.product_modifier import ProductModifier
 from app.models.product_recipe import ProductRecipe
-from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
 from app.services.order_service import recompute_product_cost_price
 
 
-def _d(x: str | float | int) -> Decimal:
-    return Decimal(str(x))
+def _d(value: str | float | int) -> Decimal:
+    return Decimal(str(value))
 
 
-def clear_transactional_data(db) -> None:
-    """Delete orders, purchases, movements, menu, inventory. Preserve users."""
-    db.execute(delete(OrderItem))
-    db.execute(delete(Order))
-    db.execute(delete(Purchase))
-    db.execute(delete(InventoryMovement))
-    db.execute(delete(ProductModifier))
-    db.execute(delete(ProductRecipe))
-    db.execute(delete(Product))
-    db.execute(delete(Category))
-    db.execute(delete(RawMaterial))
-    db.commit()
-
-
-def seed_raw_materials(db) -> dict[str, RawMaterial]:
-    """Realistic BHD costs: coffee ~8/kg → 0.008/g; milk ~1/L → 0.001/ml."""
-    rows: list[tuple[str, str, Decimal, Decimal, Decimal]] = [
-        ("Espresso blend", "g", _d("60000"), _d("2500"), _d("0.008")),
-        ("Whole milk", "ml", _d("250000"), _d("12000"), _d("0.001")),
-        ("Oat milk", "ml", _d("90000"), _d("5000"), _d("0.002")),
-        ("Vanilla syrup", "ml", _d("30000"), _d("1200"), _d("0.003")),
-        ("Caramel syrup", "ml", _d("30000"), _d("1200"), _d("0.003")),
-        ("Simple syrup", "ml", _d("35000"), _d("1500"), _d("0.002")),
-        ("Cocoa powder", "g", _d("20000"), _d("800"), _d("0.018")),
-        ("Tea leaves", "g", _d("10000"), _d("400"), _d("0.022")),
-        ("Matcha powder", "g", _d("6000"), _d("300"), _d("0.055")),
-        ("Filtered water", "ml", _d("600000"), _d("30000"), _d("0.0001")),
-        ("Croissant dough", "piece", _d("400"), _d("40"), _d("0.35")),
-        ("Puff pastry sheet", "piece", _d("250"), _d("25"), _d("0.42")),
-        ("Whipping cream", "ml", _d("40000"), _d("2500"), _d("0.0045")),
-        ("Orange juice", "ml", _d("60000"), _d("3500"), _d("0.0016")),
-        ("Apple juice", "ml", _d("50000"), _d("3000"), _d("0.0014")),
-        ("Burger bun", "piece", _d("500"), _d("50"), _d("0.11")),
-        ("Sliced bread", "piece", _d("450"), _d("45"), _d("0.035")),
-        ("Grilled chicken", "g", _d("25000"), _d("1500"), _d("0.0075")),
-        ("Cheddar cheese", "g", _d("15000"), _d("900"), _d("0.019")),
-        ("Lettuce", "g", _d("10000"), _d("600"), _d("0.002")),
-        ("Butter", "g", _d("5000"), _d("400"), _d("0.012")),
-        ("Chocolate chips", "g", _d("12000"), _d("600"), _d("0.015")),
-        ("Egg", "piece", _d("600"), _d("60"), _d("0.045")),
-    ]
-    by_key: dict[str, RawMaterial] = {}
-    for name, unit, stock, min_a, cost in rows:
-        rm = RawMaterial(
-            name=name,
-            unit=unit,
-            current_stock=stock,
-            min_stock_alert=min_a,
-            cost_per_unit=cost,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(rm)
-        key = name.lower().replace(" ", "_")
-        by_key[key] = rm
-    db.flush()
-    return by_key
-
-
-def seed_categories(db) -> dict[str, Category]:
-    specs: list[tuple[str, str | None, int]] = [
-        ("Hot Coffee", "قهوة ساخنة", 10),
-        ("Cold Coffee", "قهوة باردة", 20),
-        ("Tea & Matcha", "شاي وماتشا", 30),
-        ("Fresh Juices", "عصائر طازجة", 40),
-        ("Pastries", "مخبوزات", 50),
-        ("Sandwiches", "سندويشات", 60),
-    ]
-    out: dict[str, Category] = {}
-    for name, ar, so in specs:
-        c = Category(
-            name=name,
-            name_ar=ar,
-            sort_order=so,
-            is_active=True,
-            created_at=datetime.now(timezone.utc),
-        )
-        db.add(c)
-        out[name] = c
-    db.flush()
-    return out
-
-
-def _recipe(db, product: Product, lines: list[tuple[RawMaterial, Decimal, str]]) -> None:
-    for rm, qty, unit in lines:
-        db.add(
-            ProductRecipe(
-                product_id=product.id,
-                raw_material_id=rm.id,
-                quantity_used=qty,
-                unit=unit,
-            )
-        )
-
-
-def _mods(db, product: Product, mods: list[tuple[str, str, Decimal]]) -> None:
-    for group, option, extra in mods:
-        db.add(
-            ProductModifier(
-                product_id=product.id,
-                group_name=group,
-                option_name=option,
-                extra_price=extra,
-            )
-        )
-
-
-def add_product(
+def _get_or_create_raw_material(
     db,
-    category: Category,
     *,
     name: str,
-    name_ar: str | None,
+    unit: str,
+    current_stock: Decimal,
+    min_stock_alert: Decimal,
+    cost_per_unit: Decimal,
+) -> tuple[RawMaterial, bool]:
+    existing = db.query(RawMaterial).filter(RawMaterial.name == name).first()
+    if existing:
+        return existing, False
+    rm = RawMaterial(
+        name=name,
+        unit=unit,
+        current_stock=current_stock,
+        min_stock_alert=min_stock_alert,
+        cost_per_unit=cost_per_unit,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(rm)
+    db.flush()
+    return rm, True
+
+
+def _get_or_create_category(
+    db,
+    *,
+    name: str,
+    name_ar: str,
+    sort_order: int,
+) -> tuple[Category, bool]:
+    existing = db.query(Category).filter(Category.name == name).first()
+    if existing:
+        return existing, False
+    cat = Category(
+        name=name,
+        name_ar=name_ar,
+        sort_order=sort_order,
+        is_active=True,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(cat)
+    db.flush()
+    return cat, True
+
+
+def _get_or_create_product(
+    db,
+    *,
+    category: Category,
+    name: str,
+    name_ar: str,
     price: Decimal,
     sort_order: int,
-    recipes: list[tuple[RawMaterial, Decimal, str]],
-    modifiers: list[tuple[str, str, Decimal]] | None = None,
-) -> Product:
-    p = Product(
+) -> tuple[Product, bool]:
+    existing = (
+        db.query(Product)
+        .filter(Product.name == name, Product.category_id == category.id)
+        .first()
+    )
+    if existing:
+        return existing, False
+    product = Product(
         category_id=category.id,
         name=name,
         name_ar=name_ar,
         price=price,
-        cost_price=Decimal("0"),
+        cost_price=_d("0"),
         description=None,
         image_url=None,
         is_active=True,
         sort_order=sort_order,
         created_at=datetime.now(timezone.utc),
     )
-    db.add(p)
+    db.add(product)
     db.flush()
-    _recipe(db, p, recipes)
-    if modifiers:
-        _mods(db, p, modifiers)
-    recompute_product_cost_price(db, p.id)
-    return p
+    return product, True
 
 
-def seed_products(db, cats: dict[str, Category], m: dict[str, RawMaterial]) -> int:
-    """Returns product count."""
-    def rm(key: str) -> RawMaterial:
-        return m[key]
+def _ensure_recipe_line(
+    db,
+    *,
+    product: Product,
+    raw_material: RawMaterial,
+    quantity_used: Decimal,
+    unit: str,
+) -> bool:
+    existing = (
+        db.query(ProductRecipe)
+        .filter(
+            ProductRecipe.product_id == product.id,
+            ProductRecipe.raw_material_id == raw_material.id,
+        )
+        .first()
+    )
+    if existing:
+        return False
+    db.add(
+        ProductRecipe(
+            product_id=product.id,
+            raw_material_id=raw_material.id,
+            quantity_used=quantity_used,
+            unit=unit,
+        )
+    )
+    return True
 
-    sort = 0
 
-    # --- Hot Coffee ---
-    hc = cats["Hot Coffee"]
-    add_product(
-        db, hc, name="Espresso", name_ar="إسبريسو", price=_d("1.200"), sort_order=sort,
-        recipes=[(rm("espresso_blend"), _d("7"), "g")],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Double Espresso", name_ar="دبل إسبريسو", price=_d("1.600"), sort_order=sort,
-        recipes=[(rm("espresso_blend"), _d("14"), "g")],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Americano", name_ar="أمريكانو", price=_d("1.400"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("filtered_water"), _d("180"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Cappuccino", name_ar="كابتشينو", price=_d("1.850"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("180"), "ml"),
-        ],
-        modifiers=[
-            ("Size", "Regular", _d("0")),
-            ("Size", "Large", _d("0.150")),
-            ("Milk", "Whole", _d("0")),
-            ("Milk", "Oat", _d("0.100")),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Latte", name_ar="لاتيه", price=_d("1.950"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("200"), "ml"),
-        ],
-        modifiers=[
-            ("Size", "Regular", _d("0")),
-            ("Size", "Large", _d("0.150")),
-            ("Milk", "Whole", _d("0")),
-            ("Milk", "Oat", _d("0.100")),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Flat White", name_ar="فلات وايت", price=_d("2.050"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("14"), "g"),
-            (rm("whole_milk"), _d("160"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Cafe Mocha", name_ar="موكا", price=_d("2.250"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("170"), "ml"),
-            (rm("cocoa_powder"), _d("12"), "g"),
-            (rm("vanilla_syrup"), _d("8"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Caramel Macchiato", name_ar="كراميل ماكياتو", price=_d("2.450"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("160"), "ml"),
-            (rm("caramel_syrup"), _d("18"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, hc, name="Hot Chocolate", name_ar="شوكولاتة ساخنة", price=_d("1.900"), sort_order=sort,
-        recipes=[
-            (rm("whole_milk"), _d("220"), "ml"),
-            (rm("cocoa_powder"), _d("22"), "g"),
-            (rm("vanilla_syrup"), _d("10"), "ml"),
-        ],
-    )
-    sort += 1
+def seed_raw_materials(db) -> dict[str, RawMaterial]:
+    # Placeholder stock/cost values — update later with real purchasing data.
+    specs: list[tuple[str, str, str, str, str]] = [
+        # name, unit, current_stock, min_stock_alert, cost_per_unit (BHD)
+        ("Matcha powder", "g", "2000", "200", "0.055"),
+        ("Milk", "ml", "50000", "5000", "0.001"),
+        ("Foam", "ml", "8000", "800", "0.004"),
+        ("Vanilla syrup", "ml", "3000", "300", "0.003"),
+        ("Agave syrup", "ml", "2000", "200", "0.004"),
+        ("Ice", "g", "30000", "3000", "0.001"),
+        ("Croissant", "piece", "80", "10", "0.250"),
+        ("Chocolate", "g", "3000", "300", "0.012"),
+        ("White chocolate", "g", "2000", "200", "0.014"),
+        ("White sugar", "g", "5000", "500", "0.001"),
+        ("Cherry beans", "g", "3000", "300", "0.018"),
+        ("Classic beans", "g", "3000", "300", "0.012"),
+        ("Red Bull", "piece", "48", "12", "0.800"),
+        ("Ice tea", "ml", "10000", "1000", "0.002"),
+        ("Hibiscus", "g", "1500", "150", "0.008"),
+        ("Pineapple", "g", "8000", "800", "0.003"),
+        ("Coconut milk", "ml", "8000", "800", "0.002"),
+        ("Pineapple juice", "ml", "10000", "1000", "0.002"),
+        ("Strawberry syrup", "ml", "2500", "250", "0.003"),
+        ("Peach syrup", "ml", "2500", "250", "0.003"),
+        ("Apple syrup", "ml", "2500", "250", "0.003"),
+        ("Passion fruit syrup", "ml", "2500", "250", "0.003"),
+        ("Rose syrup", "ml", "2500", "250", "0.003"),
+        ("Hibiscus syrup", "ml", "2500", "250", "0.003"),
+    ]
+    by_name: dict[str, RawMaterial] = {}
+    created = 0
+    for name, unit, stock, min_alert, cost in specs:
+        rm, was_created = _get_or_create_raw_material(
+            db,
+            name=name,
+            unit=unit,
+            current_stock=_d(stock),
+            min_stock_alert=_d(min_alert),
+            cost_per_unit=_d(cost),
+        )
+        by_name[name] = rm
+        if was_created:
+            created += 1
+            print(f"  + raw material: {name} ({unit})")
+        else:
+            print(f"  = raw material exists: {name}")
+    print(f"Raw materials: {created} created, {len(specs) - created} already present")
+    return by_name
 
-    # --- Cold Coffee ---
-    cc = cats["Cold Coffee"]
-    add_product(
-        db, cc, name="Iced Americano", name_ar="آيس أمريكانو", price=_d("1.550"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("filtered_water"), _d("220"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, cc, name="Iced Latte", name_ar="آيس لاتيه", price=_d("2.000"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("200"), "ml"),
-        ],
-        modifiers=[
-            ("Size", "Regular", _d("0")),
-            ("Size", "Large", _d("0.150")),
-            ("Milk", "Whole", _d("0")),
-            ("Milk", "Oat", _d("0.100")),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, cc, name="Iced Caramel Latte", name_ar="آيس كراميل لاتيه", price=_d("2.350"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("180"), "ml"),
-            (rm("caramel_syrup"), _d("20"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, cc, name="Cold Brew", name_ar="كولد برو", price=_d("2.250"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("14"), "g"),
-            (rm("filtered_water"), _d("180"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, cc, name="Iced Mocha", name_ar="آيس موكا", price=_d("2.450"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("170"), "ml"),
-            (rm("cocoa_powder"), _d("12"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, cc, name="Coffee Frappé", name_ar="فرابيه قهوة", price=_d("2.850"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("8"), "g"),
-            (rm("whole_milk"), _d("100"), "ml"),
-            (rm("whipping_cream"), _d("35"), "ml"),
-            (rm("vanilla_syrup"), _d("15"), "ml"),
-            (rm("simple_syrup"), _d("15"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, cc, name="Iced Spanish Latte", name_ar="آيس سبانيش لاتيه", price=_d("2.400"), sort_order=sort,
-        recipes=[
-            (rm("espresso_blend"), _d("7"), "g"),
-            (rm("whole_milk"), _d("140"), "ml"),
-            (rm("simple_syrup"), _d("40"), "ml"),
-            (rm("vanilla_syrup"), _d("10"), "ml"),
-        ],
-    )
-    sort += 1
 
-    # --- Tea & Matcha ---
-    tm = cats["Tea & Matcha"]
-    add_product(
-        db, tm, name="English Breakfast Tea", name_ar="شاي إنجليزي", price=_d("1.050"), sort_order=sort,
-        recipes=[
-            (rm("tea_leaves"), _d("3"), "g"),
-            (rm("filtered_water"), _d("280"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, tm, name="Hot Matcha Latte", name_ar="ماتشا لاتيه ساخن", price=_d("2.550"), sort_order=sort,
-        recipes=[
-            (rm("matcha_powder"), _d("4"), "g"),
-            (rm("whole_milk"), _d("200"), "ml"),
-            (rm("vanilla_syrup"), _d("6"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, tm, name="Iced Matcha Latte", name_ar="آيس ماتشا لاتيه", price=_d("2.650"), sort_order=sort,
-        recipes=[
-            (rm("matcha_powder"), _d("4"), "g"),
-            (rm("whole_milk"), _d("200"), "ml"),
-            (rm("vanilla_syrup"), _d("8"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, tm, name="Moroccan Mint Tea", name_ar="شاي نعناع", price=_d("1.200"), sort_order=sort,
-        recipes=[
-            (rm("tea_leaves"), _d("2.5"), "g"),
-            (rm("filtered_water"), _d("260"), "ml"),
-            (rm("simple_syrup"), _d("15"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, tm, name="Lemon Iced Tea", name_ar="شاي مثلج بالليمون", price=_d("1.450"), sort_order=sort,
-        recipes=[
-            (rm("tea_leaves"), _d("3"), "g"),
-            (rm("filtered_water"), _d("220"), "ml"),
-            (rm("simple_syrup"), _d("25"), "ml"),
-        ],
-    )
-    sort += 1
+def seed_categories(db) -> dict[str, Category]:
+    specs = [
+        ("Matcha", "ماتشا", 10),
+        ("Waffles", "وافل", 20),
+        ("V60 Coffee", "قهوة V60", 30),
+        ("Refreshments", "منعشات", 40),
+    ]
+    out: dict[str, Category] = {}
+    created = 0
+    for name, name_ar, sort_order in specs:
+        cat, was_created = _get_or_create_category(
+            db, name=name, name_ar=name_ar, sort_order=sort_order
+        )
+        out[name] = cat
+        if was_created:
+            created += 1
+            print(f"  + category: {name}")
+        else:
+            print(f"  = category exists: {name}")
+    print(f"Categories: {created} created, {len(specs) - created} already present")
+    return out
 
-    # --- Fresh Juices ---
-    fj = cats["Fresh Juices"]
-    add_product(
-        db, fj, name="Fresh Orange", name_ar="برتقال طازج", price=_d("1.850"), sort_order=sort,
-        recipes=[(rm("orange_juice"), _d("350"), "ml")],
-    )
-    sort += 1
-    add_product(
-        db, fj, name="Fresh Apple", name_ar="تفاح طازج", price=_d("1.650"), sort_order=sort,
-        recipes=[(rm("apple_juice"), _d("350"), "ml")],
-    )
-    sort += 1
-    add_product(
-        db, fj, name="Orange & Apple Mix", name_ar="عصير مشكل", price=_d("1.950"), sort_order=sort,
-        recipes=[
-            (rm("orange_juice"), _d("180"), "ml"),
-            (rm("apple_juice"), _d("180"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, fj, name="Tropical Blend", name_ar="مكس استوائي", price=_d("2.100"), sort_order=sort,
-        recipes=[
-            (rm("orange_juice"), _d("200"), "ml"),
-            (rm("apple_juice"), _d("150"), "ml"),
-            (rm("simple_syrup"), _d("10"), "ml"),
-        ],
-    )
-    sort += 1
 
-    # --- Pastries ---
-    pa = cats["Pastries"]
-    add_product(
-        db, pa, name="Butter Croissant", name_ar="كرواسون زبدة", price=_d("0.850"), sort_order=sort,
-        recipes=[
-            (rm("croissant_dough"), _d("1"), "piece"),
-            (rm("butter"), _d("5"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, pa, name="Almond Croissant", name_ar="كرواسون لوز", price=_d("1.150"), sort_order=sort,
-        recipes=[
-            (rm("croissant_dough"), _d("1"), "piece"),
-            (rm("butter"), _d("6"), "g"),
-            (rm("chocolate_chips"), _d("8"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, pa, name="Pain au Chocolat", name_ar="بان أو شوكولا", price=_d("1.050"), sort_order=sort,
-        recipes=[
-            (rm("puff_pastry_sheet"), _d("1"), "piece"),
-            (rm("chocolate_chips"), _d("22"), "g"),
-            (rm("butter"), _d("4"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, pa, name="Cheese Danish", name_ar="دانية جبن", price=_d("0.950"), sort_order=sort,
-        recipes=[
-            (rm("puff_pastry_sheet"), _d("1"), "piece"),
-            (rm("cheddar_cheese"), _d("25"), "g"),
-            (rm("simple_syrup"), _d("5"), "ml"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, pa, name="Chocolate Muffin", name_ar="مافن شوكولا", price=_d("1.100"), sort_order=sort,
-        recipes=[
-            (rm("chocolate_chips"), _d("35"), "g"),
-            (rm("whole_milk"), _d("40"), "ml"),
-            (rm("butter"), _d("12"), "g"),
-            (rm("egg"), _d("1"), "piece"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, pa, name="Blueberry Scone", name_ar="سكون توت أزرق", price=_d("0.980"), sort_order=sort,
-        recipes=[
-            (rm("butter"), _d("18"), "g"),
-            (rm("whole_milk"), _d("25"), "ml"),
-            (rm("simple_syrup"), _d("8"), "ml"),
-        ],
-    )
-    sort += 1
+def seed_products_and_recipes(
+    db,
+    cats: dict[str, Category],
+    mats: dict[str, RawMaterial],
+) -> None:
+    def rm(name: str) -> RawMaterial:
+        return mats[name]
 
-    # --- Sandwiches ---
-    sw = cats["Sandwiches"]
-    add_product(
-        db, sw, name="Chicken Club", name_ar="كلوب دجاج", price=_d("2.650"), sort_order=sort,
-        recipes=[
-            (rm("burger_bun"), _d("1"), "piece"),
-            (rm("grilled_chicken"), _d("130"), "g"),
-            (rm("cheddar_cheese"), _d("35"), "g"),
-            (rm("lettuce"), _d("20"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, sw, name="Grilled Cheese", name_ar="جبن مشوي", price=_d("1.850"), sort_order=sort,
-        recipes=[
-            (rm("sliced_bread"), _d("2"), "piece"),
-            (rm("cheddar_cheese"), _d("70"), "g"),
-            (rm("butter"), _d("15"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, sw, name="Egg & Cheese Muffin", name_ar="إنجلش مافن بيض", price=_d("2.100"), sort_order=sort,
-        recipes=[
-            (rm("burger_bun"), _d("1"), "piece"),
-            (rm("egg"), _d("1"), "piece"),
-            (rm("cheddar_cheese"), _d("30"), "g"),
-            (rm("butter"), _d("5"), "g"),
-        ],
-    )
-    sort += 1
-    add_product(
-        db, sw, name="Chicken Wrap", name_ar="راب دجاج", price=_d("2.450"), sort_order=sort,
-        recipes=[
-            (rm("lettuce"), _d("35"), "g"),
-            (rm("grilled_chicken"), _d("110"), "g"),
-            (rm("cheddar_cheese"), _d("25"), "g"),
-        ],
-    )
-    sort += 1
+    products: list[dict] = [
+        {
+            "category": "Matcha",
+            "name": "French Vanilla Matcha",
+            "name_ar": "ماتشا فانيلا فرنسية",
+            "price": "2.600",
+            "sort_order": 10,
+            "recipe": [
+                (rm("Matcha powder"), "5", "g"),
+                (rm("Milk"), "200", "ml"),
+                (rm("Foam"), "40", "ml"),
+                (rm("Vanilla syrup"), "20", "ml"),
+                (rm("Ice"), "120", "g"),
+            ],
+        },
+        {
+            "category": "Matcha",
+            "name": "Seasalted Vanilla Matcha",
+            "name_ar": "ماتشا فانيلا مملحة",
+            "price": "2.500",
+            "sort_order": 20,
+            "recipe": [
+                (rm("Matcha powder"), "5", "g"),
+                (rm("Milk"), "200", "ml"),
+                (rm("Foam"), "40", "ml"),
+                (rm("Vanilla syrup"), "20", "ml"),
+                (rm("Ice"), "120", "g"),
+            ],
+        },
+        {
+            "category": "Matcha",
+            "name": "Your Birthday Matcha",
+            "name_ar": "ماتشا عيد ميلادك",
+            "price": "2.700",
+            "sort_order": 30,
+            "recipe": [
+                (rm("Matcha powder"), "5", "g"),
+                (rm("Milk"), "200", "ml"),
+                (rm("Foam"), "50", "ml"),
+                (rm("Vanilla syrup"), "20", "ml"),
+                (rm("Ice"), "120", "g"),
+            ],
+        },
+        {
+            "category": "Matcha",
+            "name": "White Chocolate Matcha",
+            "name_ar": "ماتشا شوكولاتة بيضاء",
+            "price": "2.400",
+            "sort_order": 40,
+            "recipe": [
+                (rm("Matcha powder"), "5", "g"),
+                (rm("Milk"), "200", "ml"),
+                (rm("White chocolate"), "20", "g"),
+                (rm("Ice"), "120", "g"),
+            ],
+        },
+        {
+            "category": "Waffles",
+            "name": "Chocolate Strawberry",
+            "name_ar": "شوكولاتة وفراولة",
+            "price": "1.700",
+            "sort_order": 10,
+            "recipe": [
+                (rm("Croissant"), "1", "piece"),
+                (rm("Chocolate"), "25", "g"),
+                (rm("White sugar"), "8", "g"),
+            ],
+        },
+        {
+            "category": "Waffles",
+            "name": "Cinnamon Custard",
+            "name_ar": "كاسترد بالقرفة",
+            "price": "1.500",
+            "sort_order": 20,
+            "recipe": [
+                (rm("Croissant"), "1", "piece"),
+                (rm("White chocolate"), "20", "g"),
+                (rm("White sugar"), "8", "g"),
+            ],
+        },
+        {
+            "category": "V60 Coffee",
+            "name": "V60 Cherry",
+            "name_ar": "V60 كرز",
+            "price": "1.500",
+            "sort_order": 10,
+            "recipe": [
+                (rm("Cherry beans"), "15", "g"),
+            ],
+        },
+        {
+            "category": "V60 Coffee",
+            "name": "V60 Grape",
+            "name_ar": "V60 عنب",
+            "price": "1.500",
+            "sort_order": 20,
+            "recipe": [
+                (rm("Cherry beans"), "15", "g"),
+            ],
+        },
+        {
+            "category": "V60 Coffee",
+            "name": "V60 Classic",
+            "name_ar": "V60 كلاسيك",
+            "price": "1.200",
+            "sort_order": 30,
+            "recipe": [
+                (rm("Classic beans"), "15", "g"),
+            ],
+        },
+        {
+            "category": "Refreshments",
+            "name": "Piña Colada",
+            "name_ar": "بينا كولادا",
+            "price": "1.900",
+            "sort_order": 10,
+            "recipe": [
+                (rm("Pineapple"), "80", "g"),
+                (rm("Coconut milk"), "80", "ml"),
+                (rm("Pineapple juice"), "120", "ml"),
+            ],
+        },
+        {
+            "category": "Refreshments",
+            "name": "Sun-Kissed Ice Tea",
+            "name_ar": "آيس تي",
+            "price": "1.600",
+            "sort_order": 20,
+            "recipe": [
+                (rm("Ice tea"), "250", "ml"),
+                (rm("Ice"), "120", "g"),
+            ],
+        },
+        {
+            "category": "Refreshments",
+            "name": "Naughty Hibiscus",
+            "name_ar": "كركديه",
+            "price": "1.500",
+            "sort_order": 30,
+            "recipe": [
+                (rm("Hibiscus"), "8", "g"),
+                (rm("Hibiscus syrup"), "20", "ml"),
+                (rm("Ice"), "120", "g"),
+            ],
+        },
+        {
+            "category": "Refreshments",
+            "name": "DK Redbull",
+            "name_ar": "ريد بول",
+            "price": "2.200",
+            "sort_order": 40,
+            "recipe": [
+                (rm("Red Bull"), "1", "piece"),
+            ],
+        },
+    ]
 
-    return sort
+    created_products = 0
+    created_lines = 0
+    for spec in products:
+        product, was_created = _get_or_create_product(
+            db,
+            category=cats[spec["category"]],
+            name=spec["name"],
+            name_ar=spec["name_ar"],
+            price=_d(spec["price"]),
+            sort_order=spec["sort_order"],
+        )
+        if was_created:
+            created_products += 1
+            print(f"  + product: {spec['name']} ({spec['price']} BD)")
+        else:
+            print(f"  = product exists: {spec['name']}")
+
+        for material, qty, unit in spec["recipe"]:
+            if _ensure_recipe_line(
+                db,
+                product=product,
+                raw_material=material,
+                quantity_used=_d(qty),
+                unit=unit,
+            ):
+                created_lines += 1
+        db.flush()
+        recompute_product_cost_price(db, product.id)
+
+    print(f"Products: {created_products} created, {len(products) - created_products} already present")
+    print(f"Recipe lines added: {created_lines}")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Reset menu/inventory demo data")
-    parser.add_argument(
-        "--yes",
-        action="store_true",
-        help="Skip interactive confirmation",
-    )
-    args = parser.parse_args()
-
-    if not args.yes:
-        print(
-            "This will DELETE all orders, purchases, inventory movements, "
-            "products, categories, and raw materials.\n"
-            "Users are kept. Type YES to continue:",
-            end=" ",
-        )
-        if input().strip() != "YES":
-            print("Aborted.")
-            return
-
     db = SessionLocal()
     try:
-        clear_transactional_data(db)
+        print("Seeding raw materials...")
         mats = seed_raw_materials(db)
+        print("Seeding categories...")
         cats = seed_categories(db)
-        n = seed_products(db, cats, mats)
+        print("Seeding products and recipes...")
+        seed_products_and_recipes(db, cats, mats)
         db.commit()
-        print(
-            f"Done. Seeded {len(mats)} raw materials, {len(cats)} categories, {n} products."
-        )
+
+        products = db.query(Product).order_by(Product.id).all()
+        missing = []
+        for product in products:
+            line_count = (
+                db.query(ProductRecipe)
+                .filter(ProductRecipe.product_id == product.id)
+                .count()
+            )
+            if line_count < 1:
+                missing.append(product.name)
+            print(f"  recipe check: {product.name} -> {line_count} line(s)")
+        if missing:
+            raise RuntimeError(f"Products without recipes: {missing}")
+        print("All products have at least one recipe line.")
     except Exception:
         db.rollback()
         raise

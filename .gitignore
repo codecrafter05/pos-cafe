@@ -12,3 +12,7 @@ build/
 # User-uploaded product images (keep folder via .gitkeep)
 static/uploads/products/*
 !static/uploads/products/.gitkeep
+
+# User-uploaded shop logo / QR (keep folder via .gitkeep)
+static/uploads/settings/*
+!static/uploads/settings/.gitkeep
