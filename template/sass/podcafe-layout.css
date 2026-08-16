@@ -1,4 +1,4 @@
-/* Pod Café: keep page footer at the bottom of the viewport on short pages.
+/* POS Café: keep page footer at the bottom of the viewport on short pages.
    Theme default uses position:absolute for .page-footer (bottom of short body ≠ viewport). */
 
 html {

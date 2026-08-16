@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Pod Café POS",
+    title="POS Café",
     version="1.0.0",
     description="Single-tenant coffee shop point-of-sale backend.",
     lifespan=lifespan,

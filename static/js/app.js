@@ -1,5 +1,5 @@
 /**
- * Shared helpers for Pod Café POS web UI.
+ * Shared helpers for POS Café web UI.
  * Uses the Maxton template assets mounted at /assets.
  */
 (function (window) {
