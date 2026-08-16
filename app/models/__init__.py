@@ -7,6 +7,7 @@ from app.models.product_modifier import ProductModifier
 from app.models.product_recipe import ProductRecipe
 from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
+from app.models.shop_settings import ShopSettings
 from app.models.user import User
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "ProductRecipe",
     "Purchase",
     "RawMaterial",
+    "ShopSettings",
     "User",
 ]

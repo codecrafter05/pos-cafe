@@ -49,8 +49,28 @@
       font-weight: 700;
     }
     .receipt-actions { max-width: 420px; margin: 0 auto 2rem; }
+    .receipt-logo {
+      display: block;
+      max-width: 120px;
+      max-height: 72px;
+      object-fit: contain;
+      margin: 0 auto 0.5rem;
+    }
+    .receipt-qr {
+      display: block;
+      width: 160px;
+      height: 160px;
+      object-fit: contain;
+      margin: 0.85rem auto 0;
+    }
+    .receipt-phone {
+      text-align: center;
+      color: #000;
+      font-size: 0.9rem;
+      margin: 0.45rem 0 0;
+    }
     @media print {
-      body { background: #fff; }
+      body { background: #fff; color: #000; }
       .no-print { display: none !important; }
       .receipt-sheet {
         max-width: none;
@@ -59,6 +79,13 @@
         padding: 0;
       }
       @page { margin: 10mm; }
+      .receipt-qr {
+        width: 140px;
+        height: 140px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .receipt-phone { color: #000; }
     }
   </style>
 </head>
@@ -74,6 +101,7 @@
   <script>
   (function () {
     var orderId = {{ order_id | int }};
+    var shop = {{ shop | tojson }};
 
     function esc(s) {
       return String(s || '').replace(/[&<>"']/g, function (c) {
@@ -125,6 +153,7 @@
         return;
       }
       var o = await res.json();
+      var cafeName = (shop && shop.cafe_name) ? String(shop.cafe_name) : 'My Cafe';
       document.title = 'Receipt #' + o.id;
       var rows = (o.items || []).map(function (it) {
         var line = Number(it.unit_price) * Number(it.quantity);
@@ -138,10 +167,19 @@
           '<td class="text-end">' + PodCafe.currency(line) + '</td>' +
         '</tr>';
       }).join('');
+      var logoHtml = (shop && shop.logo_url)
+        ? '<img class="receipt-logo" src="' + esc(shop.logo_url) + '" alt="">'
+        : '';
+      var qrHtml = (shop && shop.payment_qr_url)
+        ? '<img class="receipt-qr" src="' + esc(shop.payment_qr_url) + '" alt="Payment QR">'
+        : '';
+      var phoneHtml = (shop && shop.phone_number)
+        ? '<p class="receipt-phone">' + esc(shop.phone_number) + '</p>'
+        : '';
       sheet.innerHTML =
         '<div class="text-center mb-3">' +
-          '<div class="receipt-shop">Pod Café</div>' +
-          '<div class="receipt-meta">Beverages &amp; desserts</div>' +
+          logoHtml +
+          '<div class="receipt-shop">' + esc(cafeName) + '</div>' +
         '</div>' +
         '<div class="receipt-meta mb-3">' +
           '<div><strong>Order #' + o.id + '</strong></div>' +
@@ -157,8 +195,10 @@
         '<div class="d-flex justify-content-between align-items-baseline mt-3 receipt-total">' +
           '<span>Total</span><span>' + PodCafe.currency(o.total_amount) + '</span>' +
         '</div>' +
+        qrHtml +
+        phoneHtml +
         (o.notes ? '<p class="receipt-meta mt-3 mb-0">Notes: ' + esc(o.notes) + '</p>' : '') +
-        '<p class="text-center receipt-meta mt-4 mb-0">Thank you</p>';
+        '<p class="text-center receipt-meta mt-3 mb-0">Thank you</p>';
     })();
   })();
   </script>

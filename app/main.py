@@ -6,17 +6,18 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import router
 from app.api.v1.endpoints.web import router as web_router
 from app.api.store import router as store_router
-from app.core.paths import PRODUCT_UPLOAD_DIR, STATIC_DIR, TEMPLATE_DIR
+from app.core.paths import PRODUCT_UPLOAD_DIR, SETTINGS_UPLOAD_DIR, STATIC_DIR, TEMPLATE_DIR
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SETTINGS_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
 
 app = FastAPI(
-    title="Pod Café POS",
+    title="POS Café",
     version="1.0.0",
     description="Single-tenant coffee shop point-of-sale backend.",
     lifespan=lifespan,

@@ -1,5 +1,5 @@
 /**
- * Shared helpers for Pod Café POS web UI.
+ * Shared helpers for POS Café web UI.
  * Uses the Maxton template assets mounted at /assets.
  */
 (function (window) {
@@ -130,7 +130,7 @@
   var VALID_THEMES = ['blue-theme', 'light', 'dark', 'semi-dark', 'bodered-theme'];
 
   function normalizeTheme(name) {
-    return VALID_THEMES.indexOf(name) >= 0 ? name : 'blue-theme';
+    return VALID_THEMES.indexOf(name) >= 0 ? name : 'semi-dark';
   }
 
   function getTheme() {

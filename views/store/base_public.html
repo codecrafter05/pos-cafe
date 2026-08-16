@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Order online — Pod Café{% endblock %}</title>
+  <title>{% block title %}Order online — {{ shop.cafe_name }}{% endblock %}</title>
   <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
@@ -15,7 +15,12 @@
 <body class="bg-light">
   <nav class="navbar navbar-expand navbar-dark bg-dark mb-3">
     <div class="container">
-      <a class="navbar-brand fw-bold" href="/store">Pod Café</a>
+      <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/store">
+        {% if shop.logo_url %}
+        <img src="{{ shop.logo_url }}" alt="" height="28" class="rounded-2" style="object-fit:contain;max-width:40px;">
+        {% endif %}
+        <span>{{ shop.cafe_name }}</span>
+      </a>
       <div class="navbar-nav ms-auto gap-2 align-items-center flex-row">
         <a class="btn btn-sm btn-warning text-dark rounded-pill px-3 fw-semibold" href="/store/cart">
           Cart <span id="navCartCount" class="badge bg-dark ms-1">0</span>
@@ -26,6 +31,13 @@
   <div class="container pb-5">
     {% block content %}{% endblock %}
   </div>
+  {% if shop.phone_number %}
+  <footer class="border-top bg-white py-3 mt-auto">
+    <div class="container text-center small text-secondary">
+      <a class="text-decoration-none" href="tel:{{ shop.phone_number }}">{{ shop.phone_number }}</a>
+    </div>
+  </footer>
+  {% endif %}
   <script src="/assets/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/store.js"></script>
   {% block extra_js %}{% endblock %}

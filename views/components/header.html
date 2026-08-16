@@ -5,6 +5,13 @@
       <a href="javascript:;"><i class="material-icons-outlined">menu</i></a>
     </div>
 
+    <a href="/dashboard" class="d-none d-md-flex align-items-center gap-2 text-decoration-none me-2">
+      {% if shop.logo_url %}
+      <img src="{{ shop.logo_url }}" alt="" width="28" height="28" class="rounded-2 object-fit-contain">
+      {% endif %}
+      <span class="fw-semibold text-body text-truncate" style="max-width:10rem">{{ shop.cafe_name }}</span>
+    </a>
+
     <div class="search-bar flex-grow-1">
       <div class="position-relative">
         <input class="form-control rounded-5 px-5 search-control d-lg-block d-none"
@@ -28,8 +35,8 @@
           </div>
           <div class="text-secondary small fw-semibold mb-2 podcafe-theme-menu-label">Color theme</div>
           <div class="d-grid gap-1">
-            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="blue-theme">Blue (default)</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="semi-dark">Semi dark</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="blue-theme">Blue</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="semi-dark">Semi dark (default)</button>
             <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 text-start" data-podcafe-theme="bodered-theme">Bordered</button>
           </div>
         </div>
@@ -98,7 +105,7 @@
           <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;">
             <i class="material-icons-outlined">person_outline</i>Profile
           </a>
-          <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="javascript:;">
+          <a class="dropdown-item d-flex align-items-center gap-2 py-2" href="/settings">
             <i class="material-icons-outlined">settings</i>Settings
           </a>
           <hr class="dropdown-divider">

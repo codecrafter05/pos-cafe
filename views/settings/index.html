@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}{{ shop.cafe_name }} — Settings{% endblock %}
+
+{% block content %}
+<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
+  <div class="breadcrumb-title pe-3">Settings</div>
+  <div class="ps-3">
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0 p-0">
+        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
+        <li class="breadcrumb-item active" aria-current="page">Shop</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
+<div class="alert alert-warning rounded-3 d-none" id="setNoAccess">Only the owner can change shop settings.</div>
+
+<div class="row g-3 js-owner-ui">
+  <div class="col-lg-6">
+    <div class="card rounded-4 h-100">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Shop details</h5>
+        <div class="mb-3">
+          <label class="form-label" for="setName">Cafe name</label>
+          <input class="form-control rounded-3" id="setName" maxlength="150" autocomplete="organization">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="setPhone">Phone number</label>
+          <input class="form-control rounded-3" id="setPhone" maxlength="40" placeholder="optional" autocomplete="tel">
+        </div>
+        <div class="d-grid">
+          <button type="button" class="btn btn-grd-primary rounded-3" id="setSaveBtn">Save details</button>
+        </div>
+        <div class="alert alert-danger mt-3 d-none rounded-3" id="setErr"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card rounded-4 mb-3">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Logo</h5>
+        <div class="rounded-4 overflow-hidden border bg-dark bg-opacity-10 mb-3 d-flex align-items-center justify-content-center" style="min-height:140px;max-height:200px;">
+          <img id="setLogoPreview" src="" alt="" class="d-none" style="max-height:180px;max-width:100%;object-fit:contain;">
+          <div id="setLogoPh" class="text-center py-4 text-secondary small">No logo uploaded</div>
+        </div>
+        <input type="file" class="form-control form-control-sm rounded-3" id="setLogoFile"
+          accept="image/jpeg,image/png,image/webp,image/gif">
+        <p class="small text-secondary mt-2 mb-0">Choose a file — it uploads automatically.</p>
+      </div>
+    </div>
+    <div class="card rounded-4">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Payment QR</h5>
+        <p class="text-secondary small mb-3">Stored for later use. Shown on printed receipts when set.</p>
+        <div class="rounded-4 overflow-hidden border bg-dark bg-opacity-10 mb-3 d-flex align-items-center justify-content-center" style="min-height:140px;max-height:200px;">
+          <img id="setQrPreview" src="" alt="" class="d-none" style="max-height:180px;max-width:100%;object-fit:contain;">
+          <div id="setQrPh" class="text-center py-4 text-secondary small">No QR uploaded</div>
+        </div>
+        <input type="file" class="form-control form-control-sm rounded-3" id="setQrFile"
+          accept="image/jpeg,image/png,image/webp,image/gif">
+        <p class="small text-secondary mt-2 mb-0">Choose a file — it uploads automatically.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var p = PodCafe.payloadFromToken(PodCafe.getToken());
+  var owner = p && p.role === 'owner';
+
+  function apiErr(d) {
+    if (!d || d.detail == null) return null;
+    if (typeof d.detail === 'string') return d.detail;
+    if (Array.isArray(d.detail)) {
+      return d.detail.map(function (x) { return (x && (x.msg || x.message)) || JSON.stringify(x); }).join('; ');
+    }
+    return null;
+  }
+
+  function showImg(url, imgId, phId) {
+    var img = document.getElementById(imgId);
+    var ph = document.getElementById(phId);
+    if (url) {
+      img.onload = function () { img.classList.remove('d-none'); ph.classList.add('d-none'); };
+      img.onerror = function () { img.classList.add('d-none'); ph.classList.remove('d-none'); };
+      img.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_=' + Date.now();
+    } else {
+      img.removeAttribute('src');
+      img.classList.add('d-none');
+      ph.classList.remove('d-none');
+    }
+  }
+
+  function apply(s) {
+    document.getElementById('setName').value = s.cafe_name || '';
+    document.getElementById('setPhone').value = s.phone_number || '';
+    showImg(s.logo_url, 'setLogoPreview', 'setLogoPh');
+    showImg(s.payment_qr_url, 'setQrPreview', 'setQrPh');
+  }
+
+  async function load() {
+    var res = await PodCafe.apiFetch('/api/v1/settings');
+    if (!res.ok) {
+      PodCafe.toast('Could not load settings', 'danger');
+      return;
+    }
+    apply(await res.json());
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!owner) {
+      document.querySelectorAll('.js-owner-ui').forEach(function (el) { el.classList.add('d-none'); });
+      document.getElementById('setNoAccess').classList.remove('d-none');
+      return;
+    }
+
+    document.getElementById('setSaveBtn').addEventListener('click', async function () {
+      var err = document.getElementById('setErr');
+      err.classList.add('d-none');
+      var res = await PodCafe.apiFetch('/api/v1/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          cafe_name: document.getElementById('setName').value.trim(),
+          phone_number: document.getElementById('setPhone').value.trim() || null
+        })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) {
+        err.textContent = apiErr(data) || 'Save failed';
+        err.classList.remove('d-none');
+        return;
+      }
+      apply(data);
+      PodCafe.toast('Settings saved', 'success');
+    });
+
+    async function upload(inputId, path, phId) {
+      var input = document.getElementById(inputId);
+      var f = input.files[0];
+      if (!f) return;
+      var ph = document.getElementById(phId);
+      if (ph) ph.textContent = 'Uploading…';
+      try {
+        var fd = new FormData();
+        var name = f.name && f.name.indexOf('.') >= 0 ? f.name : (f.name || 'image') + '.png';
+        fd.append('file', f, name);
+        var res = await PodCafe.apiUpload(path, fd);
+        var data = await res.json().catch(function () { return {}; });
+        if (!res.ok) {
+          if (ph) ph.textContent = 'Upload failed';
+          PodCafe.toast(apiErr(data) || 'Upload failed', 'danger');
+          return;
+        }
+        apply(data);
+        input.value = '';
+        PodCafe.toast('Image uploaded', 'success');
+      } catch (e) {
+        if (ph) ph.textContent = 'Upload failed';
+        PodCafe.toast('Network error — could not upload', 'danger');
+      }
+    }
+
+    document.getElementById('setLogoFile').addEventListener('change', function () {
+      upload('setLogoFile', '/api/v1/settings/logo', 'setLogoPh');
+    });
+    document.getElementById('setQrFile').addEventListener('change', function () {
+      upload('setQrFile', '/api/v1/settings/payment-qr', 'setQrPh');
+    });
+
+    load();
+  });
+})();
+</script>
+{% endblock %}
