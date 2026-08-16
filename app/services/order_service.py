@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, status
@@ -66,6 +67,9 @@ def _create_order_from_items(
     payment_method: str,
     notes: str | None,
     items: list[OrderItemIn],
+    client_uuid: str | None = None,
+    device_id: str | None = None,
+    created_at: datetime | None = None,
 ) -> Order:
     order = Order(
         user_id=user_id,
@@ -78,7 +82,11 @@ def _create_order_from_items(
         total_amount=Decimal("0"),
         total_cost=Decimal("0"),
         profit=Decimal("0"),
+        client_uuid=client_uuid,
+        device_id=device_id,
     )
+    if created_at is not None:
+        order.created_at = created_at
     db.add(order)
     db.flush()
 
@@ -163,6 +171,32 @@ def create_pos_order(db: Session, user: User, payload: OrderCreate) -> Order:
         payment_method=payload.payment_method,
         notes=payload.notes,
         items=payload.items,
+    )
+
+
+def create_device_order(
+    db: Session,
+    user: User,
+    payload: OrderCreate,
+    *,
+    client_uuid: str,
+    device_id: str | None = None,
+    created_at: datetime | None = None,
+) -> Order:
+    """In-person sale from a Sunmi companion device. Same stock/recipe path as POS."""
+    return _create_order_from_items(
+        db,
+        user_id=user.id,
+        source="sunmi_device",
+        order_status="delivered",
+        customer_name=payload.customer_name,
+        customer_phone=payload.customer_phone,
+        payment_method=payload.payment_method,
+        notes=payload.notes,
+        items=payload.items,
+        client_uuid=client_uuid,
+        device_id=device_id,
+        created_at=created_at,
     )
 
 
