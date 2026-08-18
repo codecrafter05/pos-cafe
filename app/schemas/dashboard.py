@@ -53,6 +53,14 @@ class ReportProductOut(BaseModel):
     profit: Decimal
 
 
+class ReportPaymentOut(BaseModel):
+    payment_method: str
+    label: str
+    orders: int
+    revenue: Decimal
+    profit: Decimal
+
+
 class ReportSummaryOut(BaseModel):
     date_from: str
     date_to: str
@@ -63,6 +71,7 @@ class ReportSummaryOut(BaseModel):
     avg_order_value: Decimal
     by_day: list[ReportDayOut]
     by_product: list[ReportProductOut]
+    by_payment: list[ReportPaymentOut] = []
 
 
 class InventoryAlertOut(BaseModel):

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.payments import InPersonPaymentMethod
 from app.schemas.orders import OrderItemIn
 
 
@@ -12,6 +13,7 @@ class SyncShopOut(BaseModel):
     cafe_name: str
     phone_number: str | None
     logo_url: str | None
+    payment_qr_url: str | None = None
 
 
 class SyncCategoryOut(BaseModel):
@@ -61,7 +63,8 @@ class DeviceOrderIn(BaseModel):
     items: list[OrderItemIn] = Field(..., min_length=1)
     customer_name: str | None = Field(None, max_length=100)
     customer_phone: str | None = Field(None, max_length=20)
-    payment_method: Literal["cash", "card"]
+    customer_car_plate: str | None = Field(None, max_length=40)
+    payment_method: InPersonPaymentMethod
     notes: str | None = None
 
 

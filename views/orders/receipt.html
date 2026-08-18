@@ -126,8 +126,7 @@
     }
 
     function payLabel(m) {
-      var map = { cash: 'Cash', card: 'Card', transfer: 'Transfer' };
-      return map[m] || (m || '');
+      return PodCafe.paymentLabel(m);
     }
 
     function modsLine(mods) {
