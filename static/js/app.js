@@ -183,10 +183,25 @@
     initThemePicker();
   }
 
+  // In-person sales are cash or Benefit (Bahrain's debit network); card and
+  // transfer remain for online-store and historical orders.
+  var PAYMENT_LABELS = {
+    cash: 'Cash',
+    benefit: 'Benefit',
+    card: 'Card',
+    transfer: 'Bank transfer',
+  };
+
+  function paymentLabel(method) {
+    if (!method) return '—';
+    return PAYMENT_LABELS[method] || String(method);
+  }
+
   window.PodCafe = {
     getToken: getToken,
     payloadFromToken: payloadFromToken,
     currency: currency,
+    paymentLabel: paymentLabel,
     apiFetch: apiFetch,
     apiUpload: apiUpload,
     toast: toast,

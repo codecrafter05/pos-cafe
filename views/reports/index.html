@@ -71,6 +71,26 @@
   </div>
 </div>
 
+<div class="card rounded-4 mb-3">
+  <div class="card-body">
+    <h5 class="mb-3 fw-bold">Sales by payment method</h5>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th class="text-end">Orders</th>
+            <th class="text-end">Revenue</th>
+            <th class="text-end">Share</th>
+            <th class="text-end">Profit</th>
+          </tr>
+        </thead>
+        <tbody id="rptPayBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="card rounded-4">
   <div class="card-body">
     <h5 class="mb-3 fw-bold">Profit by product</h5>
@@ -145,6 +165,26 @@
     chart.render();
   }
 
+  function renderPayments(rows, totalRevenue) {
+    var tb = document.getElementById('rptPayBody');
+    tb.innerHTML = '';
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="text-secondary small">No sales in this range</td></tr>';
+      return;
+    }
+    rows.forEach(function (r) {
+      var share = totalRevenue > 0 ? (Number(r.revenue) / totalRevenue) * 100 : 0;
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="fw-semibold">' + esc(r.label) + '</td>' +
+        '<td class="text-end">' + r.orders + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(r.revenue) + '</td>' +
+        '<td class="text-end text-secondary">' + share.toFixed(1) + '%</td>' +
+        '<td class="text-end fw-semibold">' + PodCafe.currency(r.profit) + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
   async function load() {
     var err = document.getElementById('rptErr');
     err.classList.add('d-none');
@@ -171,6 +211,7 @@
       (data.by_day || []).map(function (r) { return Number(r.revenue); }),
       (data.by_day || []).map(function (r) { return r.label; })
     );
+    renderPayments(data.by_payment || [], Number(data.revenue || 0));
     var tb = document.getElementById('rptProdBody');
     tb.innerHTML = '';
     if (!(data.by_product || []).length) {
@@ -205,6 +246,12 @@
     lines.push(['date', 'revenue', 'cost', 'profit', 'orders'].join(','));
     (lastReport.by_day || []).forEach(function (r) {
       lines.push([r.date, r.revenue, r.cost, r.profit, r.orders].map(csvCell).join(','));
+    });
+    lines.push('');
+    lines.push('By payment method');
+    lines.push(['method', 'orders', 'revenue', 'profit'].join(','));
+    (lastReport.by_payment || []).forEach(function (r) {
+      lines.push([r.label, r.orders, r.revenue, r.profit].map(csvCell).join(','));
     });
     lines.push('');
     lines.push('By product');

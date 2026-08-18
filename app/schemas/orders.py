@@ -1,8 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.payments import InPersonPaymentMethod
 
 
 class OrderModifierSnapshot(BaseModel):
@@ -22,7 +24,8 @@ class OrderCreate(BaseModel):
     items: list[OrderItemIn] = Field(..., min_length=1)
     customer_name: str | None = Field(None, max_length=100)
     customer_phone: str | None = Field(None, max_length=20)
-    payment_method: Literal["cash", "card", "transfer"]
+    customer_car_plate: str | None = Field(None, max_length=40)
+    payment_method: InPersonPaymentMethod
     notes: str | None = None
 
 
@@ -45,6 +48,7 @@ class OrderOut(BaseModel):
     staff_username: str | None = None
     customer_name: str | None
     customer_phone: str | None
+    customer_car_plate: str | None = None
     total_amount: Decimal
     total_cost: Decimal
     profit: Decimal

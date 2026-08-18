@@ -6,6 +6,7 @@ from typing import Literal
 from sqlalchemy import extract, func, text
 from sqlalchemy.orm import Session
 
+from app.core.payments import payment_label
 from app.core.time import (
     as_bahrain,
     bahrain_range_utc,
@@ -211,11 +212,43 @@ def inventory_alerts(db: Session) -> list[RawMaterial]:
     )
 
 
+def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]:
+    """Revenue split by how the customer paid, biggest earner first."""
+    rows = (
+        db.query(
+            Order.payment_method.label("payment_method"),
+            func.count().label("orders"),
+            func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
+            func.coalesce(func.sum(Order.profit), 0).label("profit"),
+        )
+        .filter(
+            Order.created_at >= start,
+            Order.created_at < end,
+            Order.status != "cancelled",
+        )
+        .group_by(Order.payment_method)
+        .all()
+    )
+    out = [
+        {
+            "payment_method": row.payment_method or "",
+            "label": payment_label(row.payment_method),
+            "orders": int(row.orders or 0),
+            "revenue": Decimal(str(row.revenue or 0)),
+            "profit": Decimal(str(row.profit or 0)),
+        }
+        for row in rows
+    ]
+    out.sort(key=lambda r: r["revenue"], reverse=True)
+    return out
+
+
 def report_for_range(db: Session, *, date_from: date, date_to: date) -> dict:
     start, end = bahrain_range_utc(date_from, date_to)
     summary = _summary_between(db, start, end)
     by_day = sales_chart_for_dates(db, date_from=date_from, date_to=date_to)
     by_product = _products_between(db, start, end, limit=None)
+    by_payment = _payments_between(db, start, end)
     return {
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
@@ -226,4 +259,5 @@ def report_for_range(db: Session, *, date_from: date, date_to: date) -> dict:
         "avg_order_value": summary.avg_order_value,
         "by_day": by_day,
         "by_product": by_product,
+        "by_payment": by_payment,
     }

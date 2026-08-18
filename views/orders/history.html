@@ -153,7 +153,7 @@
     meta.innerHTML =
       '<div class="col-md-6"><span class="text-secondary">Created</span><div class="fw-semibold">' + fmtWhen(o.created_at) + '</div></div>' +
       '<div class="col-md-6"><span class="text-secondary">Staff</span><div class="fw-semibold">' + esc(o.staff_username || ('#' + o.user_id)) + '</div></div>' +
-      '<div class="col-md-6 mt-2"><span class="text-secondary">Payment</span><div class="fw-semibold">' + esc(o.payment_method) + '</div></div>' +
+      '<div class="col-md-6 mt-2"><span class="text-secondary">Payment</span><div class="fw-semibold">' + esc(PodCafe.paymentLabel(o.payment_method)) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Source</span><div class="fw-semibold">' + esc(o.source) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Status</span><div class="fw-semibold">' + esc(o.status) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Totals</span><div class="fw-semibold">' +

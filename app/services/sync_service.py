@@ -34,7 +34,9 @@ def _http_detail_reason(exc: HTTPException) -> str:
 
 def _catalog_version(categories: list[Category], products: list[Product], shop: SyncShopOut) -> str:
     h = hashlib.sha256()
-    h.update(f"shop|{shop.cafe_name}|{shop.phone_number}|{shop.logo_url}".encode())
+    h.update(
+        f"shop|{shop.cafe_name}|{shop.phone_number}|{shop.logo_url}|{shop.payment_qr_url}".encode()
+    )
     for cat in categories:
         h.update(f"c|{cat.id}|{cat.name}|{cat.name_ar}|{cat.sort_order}".encode())
     for product in products:
@@ -55,6 +57,7 @@ def get_device_catalog(db: Session) -> SyncCatalogOut:
         cafe_name=display_cafe_name(settings_row),
         phone_number=settings_row.phone_number,
         logo_url=settings_row.logo_url,
+        payment_qr_url=settings_row.payment_qr_url,
     )
     categories = (
         db.query(Category)
@@ -151,6 +154,7 @@ def _sync_one_device_order(
         items=payload.items,
         customer_name=payload.customer_name,
         customer_phone=payload.customer_phone,
+        customer_car_plate=payload.customer_car_plate,
         payment_method=payload.payment_method,
         notes=payload.notes,
     )

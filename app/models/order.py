@@ -20,10 +20,13 @@ class Order(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     customer_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     customer_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    customer_car_plate: Mapped[str | None] = mapped_column(String(40), nullable=True)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     total_cost: Mapped[Decimal] = mapped_column(Numeric(10, 3), default=Decimal("0"), nullable=False)
     profit: Mapped[Decimal] = mapped_column(Numeric(10, 3), default=Decimal("0"), nullable=False)
-    payment_method: Mapped[str] = mapped_column(String(20), nullable=False)  # cash | card | transfer
+    # In-person: cash | benefit. Online store also uses card | transfer, and
+    # pre-2026 orders may still hold those values.
+    payment_method: Mapped[str] = mapped_column(String(20), nullable=False)
     source: Mapped[str] = mapped_column(
         String(20), default="pos", nullable=False
     )  # pos | online | sunmi_device
