@@ -183,7 +183,6 @@
         '<div class="receipt-meta mb-3">' +
           '<div><strong>Order #' + o.id + '</strong></div>' +
           '<div>' + fmtBh(o.created_at) + '</div>' +
-          '<div>Cashier: ' + esc(o.staff_username || '—') + '</div>' +
           '<div>Payment: ' + esc(payLabel(o.payment_method)) + '</div>' +
           (o.customer_name ? '<div>Customer: ' + esc(o.customer_name) + '</div>' : '') +
         '</div>' +
