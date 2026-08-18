@@ -20,7 +20,12 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         )
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
-    token = create_access_token(subject=user.username, role=user.role)
+    minutes = 30 * 24 * 60 if body.client == "device" else None
+    token = create_access_token(
+        subject=user.username,
+        role=user.role,
+        expires_minutes=minutes,
+    )
     return TokenResponse(access_token=token)
 
 
