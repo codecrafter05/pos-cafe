@@ -7,6 +7,9 @@ from app.services import shop_settings_service
 
 templates = Jinja2Templates(directory=str(PROJECT_ROOT / "views"))
 
+# Public /store: set True to show Add buttons and Cart when online ordering launches.
+STORE_ORDERING_ENABLED = False
+
 
 def shop_public_dict() -> dict:
     db = SessionLocal()
@@ -27,4 +30,5 @@ def render(request: Request, name: str, context: dict | None = None):
     ctx = dict(context or {})
     ctx["request"] = request
     ctx["shop"] = shop_public_dict()
+    ctx.setdefault("store_ordering_enabled", STORE_ORDERING_ENABLED)
     return templates.TemplateResponse(name, ctx)
