@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="/static/js/auth-gate.js" data-podcafe-gate="protected"></script>
   <script>
   (function () {
     try {
@@ -66,14 +67,18 @@
     $(function () { $('#sidenav').metisMenu(); });
 
     (function () {
-      var token = localStorage.getItem('access_token');
-      if (!token) {
-        window.location.replace('/login');
+      if (window.__PODCAFE_REDIRECTING__) return;
+      if (window.PodCafeAuth && !PodCafeAuth.isAccessTokenValid()) {
+        PodCafeAuth.redirectToLogin();
         return;
       }
-      var payload = window.PodCafe ? PodCafe.payloadFromToken(token) : null;
+      var token = localStorage.getItem('access_token');
+      var payload = window.PodCafeAuth
+        ? PodCafeAuth.payloadFromToken(token)
+        : (window.PodCafe ? PodCafe.payloadFromToken(token) : null);
       if (!payload) {
-        window.location.replace('/login');
+        if (window.PodCafeAuth) PodCafeAuth.redirectToLogin();
+        else window.location.replace('/login');
         return;
       }
       var sub = payload.sub || 'User';

@@ -154,6 +154,7 @@
 <script src="/assets/plugins/apexchart/apexcharts.min.js"></script>
 <script>
 (function () {
+  if (window.__PODCAFE_REDIRECTING__) return;
   var p = PodCafe.payloadFromToken(PodCafe.getToken());
   if (p && p.role === 'cashier') {
     window.location.replace('/pos');

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="/static/js/auth-gate.js" data-podcafe-gate="protected"></script>
   <title>Receipt</title>
   <link rel="icon" href="/assets/images/favicon-32x32.png" type="image/png">
   <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
@@ -140,9 +141,11 @@
     document.getElementById('closeBtn').addEventListener('click', function () { window.close(); });
 
     (async function () {
+      if (window.__PODCAFE_REDIRECTING__) return;
       var token = PodCafe.getToken();
-      if (!token) {
-        window.location.replace('/login');
+      if (!token || (window.PodCafeAuth && !PodCafeAuth.isAccessTokenValid())) {
+        if (window.PodCafeAuth) PodCafeAuth.redirectToLogin();
+        else window.location.replace('/login');
         return;
       }
       var res = await PodCafe.apiFetch('/api/v1/orders/' + encodeURIComponent(orderId));
