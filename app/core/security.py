@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -37,3 +39,11 @@ def decode_access_token(token: str) -> dict | None:
         return {"sub": sub, "role": payload.get("role")}
     except JWTError:
         return None
+
+
+def new_refresh_token_plain() -> str:
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(plain: str) -> str:
+    return hashlib.sha256(plain.encode("utf-8")).hexdigest()

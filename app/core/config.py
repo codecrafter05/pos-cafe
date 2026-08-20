@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    # Handheld POS: short-lived access JWT, long-lived rotating refresh token.
+    DEVICE_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 90
     ALGORITHM: str = "HS256"
 
     # Evolution / WhatsApp (optional — Phase 3). README: EVOLUTION_API_URL

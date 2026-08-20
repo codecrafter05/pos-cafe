@@ -15,6 +15,12 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    refresh_token: str | None = None
+    expires_in: int | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class UserOut(BaseModel):
@@ -26,3 +32,11 @@ class UserOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class DeviceSessionOut(BaseModel):
+    id: int
+    created_at: datetime
+    last_used_at: datetime | None
+    expires_at: datetime
+    revoked: bool
