@@ -7,7 +7,9 @@ from app.core.security import hash_password
 from app.models.order import Order
 from app.models.purchase import Purchase
 from app.models.user import User
+from app.schemas.auth import DeviceSessionOut
 from app.schemas.dashboard import UserAdminCreate, UserAdminUpdate, UserListOut
+from app.services import refresh_token_service
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -61,6 +63,9 @@ def update_user(
         setattr(user, k, v)
     if pw:
         user.password_hash = hash_password(pw)
+        refresh_token_service.revoke_all_for_user(db, user.id)
+    if data.get("is_active") is False:
+        refresh_token_service.revoke_all_for_user(db, user.id)
     db.commit()
     db.refresh(user)
     return user
@@ -91,5 +96,41 @@ def delete_user(
             detail="Cannot delete a user linked to purchase records.",
         )
     db.delete(user)
+    db.commit()
+    return None
+
+
+@router.get("/{user_id}/device-sessions", response_model=list[DeviceSessionOut])
+def list_device_sessions(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(_owner),
+):
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    rows = refresh_token_service.list_for_user(db, user_id)
+    return [
+        DeviceSessionOut(
+            id=r.id,
+            created_at=r.created_at,
+            last_used_at=r.last_used_at,
+            expires_at=r.expires_at,
+            revoked=r.revoked_at is not None,
+        )
+        for r in rows
+    ]
+
+
+@router.post("/{user_id}/device-sessions/revoke-all", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_all_device_sessions(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(_owner),
+):
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    refresh_token_service.revoke_all_for_user(db, user_id)
     db.commit()
     return None

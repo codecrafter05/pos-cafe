@@ -9,6 +9,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.order import Order
     from app.models.purchase import Purchase
+    from app.models.refresh_token import RefreshToken
 
 
 class User(Base):
@@ -26,3 +27,6 @@ class User(Base):
 
     orders: Mapped[list["Order"]] = relationship("Order", back_populates="user")
     purchases: Mapped[list["Purchase"]] = relationship("Purchase", back_populates="user")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )

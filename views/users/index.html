@@ -145,6 +145,7 @@
         '<td>' + (u.is_active ? '<span class="text-success">Yes</span>' : '<span class="text-danger">No</span>') + '</td>' +
         '<td class="text-end text-nowrap">' +
           '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 me-1 js-edit" data-id="' + u.id + '">Edit</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-warning rounded-3 me-1 js-revoke" data-id="' + u.id + '" data-label="' + escAttr(u.name) + '">Sign out devices</button>' +
           delHtml +
         '</td>';
       tb.appendChild(tr);
@@ -157,6 +158,20 @@
         document.getElementById('delUsrId').value = btn.getAttribute('data-id') || '';
         document.getElementById('delUsrLabel').textContent = btn.getAttribute('data-label') || '';
         new bootstrap.Modal(document.getElementById('delUsrModal')).show();
+      });
+    });
+    tb.querySelectorAll('.js-revoke').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var id = btn.getAttribute('data-id');
+        var label = btn.getAttribute('data-label') || 'this user';
+        if (!id) return;
+        if (!window.confirm('Sign out all handheld devices for ' + label + '? They will need to log in again.')) return;
+        var res = await PodCafe.apiFetch('/api/v1/users/' + encodeURIComponent(id) + '/device-sessions/revoke-all', { method: 'POST' });
+        if (!res.ok) {
+          PodCafe.toast('Could not revoke device sessions', 'danger');
+          return;
+        }
+        PodCafe.toast('Device sessions revoked', 'success');
       });
     });
   }
