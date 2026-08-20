@@ -90,13 +90,13 @@
 
   <script src="/assets/js/jquery.min.js"></script>
   <script src="/assets/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/auth-gate.js"></script>
   <script src="/static/js/app.js"></script>
   <script>
-    // Redirect if already logged in
-    if (localStorage.getItem('access_token')) {
-      var pay = window.PodCafe ? PodCafe.payloadFromToken(localStorage.getItem('access_token')) : null;
-      if (pay && pay.role === 'cashier') window.location.href = '/pos';
-      else window.location.href = '/dashboard';
+    if (window.PodCafeAuth) PodCafeAuth.discardInvalidToken();
+    if (window.PodCafeAuth && PodCafeAuth.isAccessTokenValid()) {
+      var pay = PodCafeAuth.payloadFromToken(PodCafeAuth.getToken());
+      window.location.replace(PodCafeAuth.destinationAfterLogin(pay && pay.role));
     }
 
     // Toggle password visibility
@@ -138,9 +138,13 @@
 
         if (res.ok) {
           localStorage.setItem('access_token', data.access_token);
-          var pay = window.PodCafe ? PodCafe.payloadFromToken(data.access_token) : null;
-          if (pay && pay.role === 'cashier') window.location.href = '/pos';
-          else window.location.href = '/dashboard';
+          var pay = window.PodCafeAuth
+            ? PodCafeAuth.payloadFromToken(data.access_token)
+            : (window.PodCafe ? PodCafe.payloadFromToken(data.access_token) : null);
+          var dest = window.PodCafeAuth
+            ? PodCafeAuth.destinationAfterLogin(pay && pay.role)
+            : (pay && pay.role === 'cashier' ? '/pos' : '/dashboard');
+          window.location.replace(dest);
         } else {
           const msg = data.detail || 'Login failed. Please check your credentials.';
           errorAlert.text(typeof msg === 'string' ? msg : 'Invalid credentials').removeClass('d-none');

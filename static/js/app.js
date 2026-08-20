@@ -10,10 +10,14 @@
   }
 
   function payloadFromToken(token) {
+    if (window.PodCafeAuth) return window.PodCafeAuth.payloadFromToken(token);
     if (!token) return null;
     try {
       var body = token.split('.')[1];
-      return JSON.parse(atob(body));
+      if (!body) return null;
+      var pad = body.replace(/-/g, '+').replace(/_/g, '/');
+      while (pad.length % 4) pad += '=';
+      return JSON.parse(atob(pad));
     } catch (e) {
       return null;
     }
@@ -31,7 +35,31 @@
     );
   }
 
+  function unauthorizedResponse() {
+    return new Response('{}', {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  function redirectToLogin() {
+    if (window.PodCafeAuth) {
+      window.PodCafeAuth.redirectToLogin();
+      return;
+    }
+    window.__PODCAFE_REDIRECTING__ = true;
+    try {
+      localStorage.removeItem('access_token');
+    } catch (e) { /* ignore */ }
+    location.replace('/login');
+  }
+
   async function apiFetch(path, opts) {
+    if (window.__PODCAFE_REDIRECTING__) return unauthorizedResponse();
+    if (window.PodCafeAuth && !window.PodCafeAuth.isAccessTokenValid()) {
+      window.PodCafeAuth.redirectToLogin();
+      return unauthorizedResponse();
+    }
     opts = opts || {};
     var headers = opts.headers || {};
     var token = getToken();
@@ -47,6 +75,12 @@
         cache: 'no-store',
       })
     );
+    if (res.status === 401) {
+      try {
+        localStorage.removeItem('access_token');
+      } catch (e) { /* ignore */ }
+      redirectToLogin();
+    }
     return res;
   }
 
@@ -80,6 +114,7 @@
    * Non-blocking message (Bootstrap 5 toast). Variants: success, danger, warning, info.
    */
   function toast(message, variant) {
+    if (window.__PODCAFE_REDIRECTING__) return;
     var text = String(message != null ? message : '');
     variant = variant || 'info';
     if (typeof bootstrap === 'undefined' || !bootstrap.Toast) {
