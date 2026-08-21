@@ -26,6 +26,9 @@ class InventoryMovement(Base):
     order_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    order_item_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("order_items.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False

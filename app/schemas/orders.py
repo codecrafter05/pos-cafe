@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,8 +38,13 @@ class OrderItemOut(BaseModel):
     unit_cost: Decimal
     modifiers_snapshot: list[dict[str, Any]] | dict[str, Any] | None = None
     notes: str | None
+    line_status: str = "sold"
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OrderItemLineStatusUpdate(BaseModel):
+    status: Literal["cancelled", "wasted"]
 
 
 class OrderOut(BaseModel):

@@ -34,6 +34,24 @@ class PeakHourOut(BaseModel):
     orders: int
 
 
+class WasteProductOut(BaseModel):
+    product_id: int
+    name: str
+    name_ar: str | None
+    units: int
+    lost_retail: Decimal
+    lost_cost: Decimal
+
+
+class WasteSummaryOut(BaseModel):
+    items_count: int
+    products_count: int
+    lost_retail: Decimal
+    lost_cost: Decimal
+    products: list[WasteProductOut]
+    period: Period
+
+
 class ReportDayOut(BaseModel):
     date: str
     label: str

@@ -2,6 +2,108 @@
 
 {% block title %}{{ shop.cafe_name }} — Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+  .dash-waste {
+    border: 1px solid rgba(154, 107, 66, 0.14);
+    background: linear-gradient(180deg, rgba(255, 250, 244, 0.55), transparent 42%);
+  }
+  .dash-waste__title {
+    letter-spacing: -0.02em;
+  }
+  .dash-waste__hint {
+    max-width: 36rem;
+    line-height: 1.45;
+  }
+  .dash-waste__stats {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+  @media (min-width: 768px) {
+    .dash-waste__stats {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .dash-waste__stat {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(44, 36, 28, 0.08);
+    border-radius: 1rem;
+    padding: 1rem 1.1rem 1.05rem;
+  }
+  .dash-waste__stat-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8a7b6c;
+    margin-bottom: 0.35rem;
+  }
+  .dash-waste__stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c241c;
+    line-height: 1.2;
+  }
+  .dash-waste__stat-note {
+    font-size: 0.78rem;
+    color: #6d5f52;
+    margin-top: 0.3rem;
+  }
+  .dash-waste__stat--loss .dash-waste__stat-value {
+    color: #9a6b42;
+  }
+  .dash-waste__table {
+    width: 100%;
+    margin: 0;
+  }
+  .dash-waste__table th {
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: #8a7b6c;
+    border-bottom-color: rgba(44, 36, 28, 0.08);
+    padding: 0.55rem 0.65rem;
+  }
+  .dash-waste__table td {
+    padding: 0.42rem 0.65rem;
+    border-bottom-color: rgba(44, 36, 28, 0.06);
+    vertical-align: middle;
+  }
+  .dash-waste__list {
+    max-height: 32.5rem; /* header + ~20 compact rows; extra items scroll here */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid rgba(44, 36, 28, 0.08);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.62);
+  }
+  .dash-waste__list .table-responsive {
+    overflow: visible;
+  }
+  .dash-waste__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #fffaf4;
+    box-shadow: 0 1px 0 rgba(44, 36, 28, 0.08);
+  }
+  .dash-waste__more {
+    font-size: 0.78rem;
+    color: #8a7b6c;
+    margin-top: 0.55rem;
+  }
+  .dash-waste__empty {
+    text-align: center;
+    padding: 1.75rem 1rem;
+    color: #6d5f52;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 1rem;
+    border: 1px dashed rgba(44, 36, 28, 0.12);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 
   <div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
@@ -95,7 +197,7 @@
               <p class="mb-0 text-secondary" style="font-size:12px;">Net profit</p>
             </div>
           </div>
-          <p class="mb-1 text-secondary" style="font-size:12px;">Non-cancelled orders</p>
+          <p class="mb-1 text-secondary" style="font-size:12px;">After cancellations; waste stays in cost</p>
         </div>
       </div>
     </div>
@@ -143,6 +245,39 @@
         <div class="card-body">
           <h5 class="mb-3 fw-bold">Peak hours (selected period)</h5>
           <div id="dashPeak" class="small text-secondary">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card rounded-4 dash-waste">
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <h5 class="dash-waste__title fw-bold mb-1">Waste</h5>
+            <p class="dash-waste__hint mb-0 text-secondary small">Dishes that were made but not sold — wrong ticket, kitchen mistake, or anything similar. Ingredients stay used and are not returned to stock.</p>
+          </div>
+          <div class="dash-waste__stats mb-4">
+            <div class="dash-waste__stat dash-waste__stat--loss">
+              <div class="dash-waste__stat-label">Money lost</div>
+              <div class="dash-waste__stat-value" id="dashWasteCost">—</div>
+              <div class="dash-waste__stat-note">Ingredient cost of wasted dishes</div>
+            </div>
+            <div class="dash-waste__stat">
+              <div class="dash-waste__stat-label">Could have sold</div>
+              <div class="dash-waste__stat-value" id="dashWasteRetail">—</div>
+              <div class="dash-waste__stat-note">Menu price of those dishes</div>
+            </div>
+            <div class="dash-waste__stat">
+              <div class="dash-waste__stat-label">Dishes wasted</div>
+              <div class="dash-waste__stat-value" id="dashWasteCount">—</div>
+              <div class="dash-waste__stat-note">How many items were marked waste</div>
+            </div>
+          </div>
+          <div id="dashWasteProducts">
+            <div class="dash-waste__empty">Loading…</div>
+          </div>
         </div>
       </div>
     </div>
@@ -243,6 +378,44 @@
     });
   }
 
+  async function loadWaste(period) {
+    var wrap = document.getElementById('dashWasteProducts');
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/waste?period=' + encodeURIComponent(period));
+    if (!res.ok) {
+      document.getElementById('dashWasteCost').textContent = '—';
+      document.getElementById('dashWasteRetail').textContent = '—';
+      document.getElementById('dashWasteCount').textContent = '—';
+      wrap.innerHTML = '<div class="dash-waste__empty">Could not load waste for this period.</div>';
+      return;
+    }
+    var d = await res.json();
+    document.getElementById('dashWasteCost').textContent = PodCafe.currency(d.lost_cost);
+    document.getElementById('dashWasteRetail').textContent = PodCafe.currency(d.lost_retail);
+    document.getElementById('dashWasteCount').textContent = String(d.items_count);
+    if (!d.products || !d.products.length) {
+      wrap.innerHTML = '<div class="dash-waste__empty">No wasted dishes in this period.</div>';
+      return;
+    }
+    var rows = d.products.map(function (r) {
+      return '<tr>' +
+        '<td class="fw-semibold">' + esc(r.name) + '</td>' +
+        '<td class="text-center text-secondary">' + r.units + '</td>' +
+        '<td class="text-end">' + PodCafe.currency(r.lost_cost) + '</td>' +
+        '<td class="text-end text-secondary">' + PodCafe.currency(r.lost_retail) + '</td>' +
+        '</tr>';
+    }).join('');
+    wrap.innerHTML =
+      '<div class="dash-waste__list">' +
+      '<div class="table-responsive">' +
+      '<table class="table dash-waste__table mb-0">' +
+      '<thead><tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Cost lost</th><th class="text-end">Retail</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody>' +
+      '</table></div></div>' +
+      (d.products.length > 20
+        ? '<p class="dash-waste__more mb-0">Showing 20 at a time — scroll inside the list for the rest (' + d.products.length + ' products).</p>'
+        : '');
+  }
+
   async function loadAlerts() {
     var box = document.getElementById('dashAlerts');
     var res = await PodCafe.apiFetch('/api/v1/dashboard/inventory-alerts');
@@ -301,6 +474,7 @@
       loadSummary(period),
       loadChart(period),
       loadTop(period),
+      loadWaste(period),
       loadAlerts(),
       loadPeak(period)
     ]);

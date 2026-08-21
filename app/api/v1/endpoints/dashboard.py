@@ -13,6 +13,7 @@ from app.schemas.dashboard import (
     Period,
     SalesChartPointOut,
     TopProductOut,
+    WasteSummaryOut,
 )
 from app.services import dashboard_service
 
@@ -69,6 +70,16 @@ def peak_hours(
 ):
     rows = dashboard_service.peak_hours(db, period=period)
     return [PeakHourOut(**r) for r in rows]
+
+
+@router.get("/waste", response_model=WasteSummaryOut)
+def waste(
+    period: Annotated[Period, Query()] = "today",
+    db: Session = Depends(get_db),
+    _: User = Depends(_admin),
+):
+    data = dashboard_service.waste_summary(db, period=period)
+    return WasteSummaryOut(**data, period=period)
 
 
 @router.get("/inventory-alerts", response_model=list[InventoryAlertOut])
