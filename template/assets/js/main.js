@@ -4,11 +4,15 @@ $(function () {
   "use strict";
 
 
-  /* scrollar */
+  /* scrollar — skip missing stubs so the rest of this file (sidebar toggle) still runs */
 
-  new PerfectScrollbar(".notify-list")
-
-  new PerfectScrollbar(".search-content")
+  [".notify-list", ".search-content"].forEach(function (sel) {
+    var el = document.querySelector(sel);
+    if (!el) return;
+    try {
+      new PerfectScrollbar(el);
+    } catch (e) { /* ignore */ }
+  });
 
   // new PerfectScrollbar(".mega-menu-widgets")
 
