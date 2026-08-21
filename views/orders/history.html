@@ -35,7 +35,9 @@
         <option value="cancelled">cancelled</option>
       </select>
     </div>
-    <div class="col-md-3 text-md-end">
+    <div class="col-md-3 text-md-end d-flex flex-wrap justify-content-md-end gap-2">
+      <button type="button" class="btn btn-outline-secondary rounded-3" id="fltToday" aria-pressed="false">Today</button>
+      <button type="button" class="btn btn-outline-secondary rounded-3" id="fltYesterday" aria-pressed="false">Yesterday</button>
       <button type="button" class="btn btn-grd-primary rounded-3 px-4" id="fltApply">Apply</button>
     </div>
   </div>
@@ -120,6 +122,33 @@
 <script>
 (function () {
   function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
+
+  function todayISO() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bahrain' });
+  }
+
+  function yesterdayISO() {
+    var parts = todayISO().split('-');
+    var d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setQuickPressed(btn, on) {
+    if (!btn) return;
+    btn.classList.toggle('btn-grd-primary', on);
+    btn.classList.toggle('btn-outline-secondary', !on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function syncQuickRange() {
+    var from = document.getElementById('fltFrom').value;
+    var to = document.getElementById('fltTo').value;
+    var isToday = from && to && from === to && from === todayISO();
+    var isYest = from && to && from === to && from === yesterdayISO();
+    setQuickPressed(document.getElementById('fltToday'), isToday);
+    setQuickPressed(document.getElementById('fltYesterday'), isYest);
+  }
 
   function fmtWhen(iso) {
     try {
@@ -300,7 +329,24 @@
     });
   }
 
-  document.getElementById('fltApply').addEventListener('click', load);
+  document.getElementById('fltApply').addEventListener('click', function () {
+    syncQuickRange();
+    load();
+  });
+  document.getElementById('fltToday').addEventListener('click', function () {
+    var t = todayISO();
+    document.getElementById('fltFrom').value = t;
+    document.getElementById('fltTo').value = t;
+    syncQuickRange();
+    load();
+  });
+  document.getElementById('fltYesterday').addEventListener('click', function () {
+    var y = yesterdayISO();
+    document.getElementById('fltFrom').value = y;
+    document.getElementById('fltTo').value = y;
+    syncQuickRange();
+    load();
+  });
   document.getElementById('stSave').addEventListener('click', async function () {
     var id = document.getElementById('stOrderId').value;
     var st = document.getElementById('stVal').value;

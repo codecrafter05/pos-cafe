@@ -116,13 +116,23 @@
         </ol>
       </nav>
     </div>
-    <div class="ms-auto d-flex align-items-center gap-2">
-      <select class="form-select form-select-sm rounded-3" id="dashPeriod" style="width:auto; min-width: 8rem;">
-        <option value="today">Today</option>
-        <option value="week">Last 7 days</option>
-        <option value="month">This month</option>
-      </select>
-      <span class="text-secondary" id="currentDate" style="font-size:14px;"></span>
+  </div>
+
+  <div class="card rounded-4 mb-3">
+    <div class="card-body row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small text-secondary mb-1">From</label>
+        <input type="date" class="form-control rounded-3" id="dashFrom">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-secondary mb-1">To</label>
+        <input type="date" class="form-control rounded-3" id="dashTo">
+      </div>
+      <div class="col-md-6 text-md-end d-flex flex-wrap justify-content-md-end gap-2">
+        <button type="button" class="btn btn-outline-secondary rounded-3" id="dashToday" aria-pressed="false">Today</button>
+        <button type="button" class="btn btn-outline-secondary rounded-3" id="dashYesterday" aria-pressed="false">Yesterday</button>
+        <button type="button" class="btn btn-grd-primary rounded-3 px-4" id="dashApply">Apply</button>
+      </div>
     </div>
   </div>
 
@@ -326,8 +336,47 @@
     chart.render();
   }
 
-  async function loadSummary(period) {
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/summary?period=' + encodeURIComponent(period));
+  function todayISO() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bahrain' });
+  }
+
+  function yesterdayISO() {
+    var parts = todayISO().split('-');
+    var d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setQuickPressed(btn, on) {
+    if (!btn) return;
+    btn.classList.toggle('btn-grd-primary', on);
+    btn.classList.toggle('btn-outline-secondary', !on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function syncQuickRange() {
+    var from = document.getElementById('dashFrom').value;
+    var to = document.getElementById('dashTo').value;
+    var isToday = from && to && from === to && from === todayISO();
+    var isYest = from && to && from === to && from === yesterdayISO();
+    setQuickPressed(document.getElementById('dashToday'), isToday);
+    setQuickPressed(document.getElementById('dashYesterday'), isYest);
+  }
+
+  function rangeQuery() {
+    var from = document.getElementById('dashFrom').value;
+    var to = document.getElementById('dashTo').value;
+    return 'date_from=' + encodeURIComponent(from) + '&date_to=' + encodeURIComponent(to);
+  }
+
+  function formatRangeLabel(from, to) {
+    if (!from || !to) return '';
+    if (from === to) return from;
+    return from + ' → ' + to;
+  }
+
+  async function loadSummary() {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/summary?' + rangeQuery());
     if (!res.ok) {
       PodCafe.toast('Could not load summary', 'danger');
       return;
@@ -339,8 +388,8 @@
     document.getElementById('dashProfit').textContent = PodCafe.currency(d.net_profit);
   }
 
-  async function loadChart(period) {
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/sales-chart?period=' + encodeURIComponent(period));
+  async function loadChart() {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/sales-chart?' + rangeQuery());
     if (!res.ok) return;
     var rows = await res.json();
     var s = rows.map(function (r) { return Number(r.revenue); });
@@ -348,12 +397,15 @@
     renderChart(s, lbl);
     var badge = document.getElementById('dashChartBadge');
     if (badge) {
-      badge.textContent = period === 'today' ? 'Today' : (period === 'month' ? 'This month' : 'Last 7 days');
+      badge.textContent = formatRangeLabel(
+        document.getElementById('dashFrom').value,
+        document.getElementById('dashTo').value
+      );
     }
   }
 
-  async function loadTop(period) {
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/top-products?period=' + encodeURIComponent(period) + '&limit=6');
+  async function loadTop() {
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/top-products?' + rangeQuery() + '&limit=6');
     var ul = document.getElementById('dashTopProducts');
     if (!res.ok) {
       ul.innerHTML = '<li class="list-group-item px-0 bg-transparent text-danger small">Failed to load</li>';
@@ -378,9 +430,9 @@
     });
   }
 
-  async function loadWaste(period) {
+  async function loadWaste() {
     var wrap = document.getElementById('dashWasteProducts');
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/waste?period=' + encodeURIComponent(period));
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/waste?' + rangeQuery());
     if (!res.ok) {
       document.getElementById('dashWasteCost').textContent = '—';
       document.getElementById('dashWasteRetail').textContent = '—';
@@ -440,9 +492,9 @@
     });
   }
 
-  async function loadPeak(period) {
+  async function loadPeak() {
     var box = document.getElementById('dashPeak');
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/peak-hours?period=' + encodeURIComponent(period));
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/peak-hours?' + rangeQuery());
     if (!res.ok) {
       box.textContent = 'Could not load peak hours';
       return;
@@ -469,19 +521,48 @@
   }
 
   async function refreshAll() {
-    var period = document.getElementById('dashPeriod').value;
+    var from = document.getElementById('dashFrom').value;
+    var to = document.getElementById('dashTo').value;
+    if (!from || !to) return;
+    if (to < from) {
+      PodCafe.toast('End date must be on or after start date', 'danger');
+      return;
+    }
     await Promise.all([
-      loadSummary(period),
-      loadChart(period),
-      loadTop(period),
-      loadWaste(period),
+      loadSummary(),
+      loadChart(),
+      loadTop(),
+      loadWaste(),
       loadAlerts(),
-      loadPeak(period)
+      loadPeak()
     ]);
   }
 
-  document.getElementById('dashPeriod').addEventListener('change', refreshAll);
-  document.addEventListener('DOMContentLoaded', refreshAll);
+  document.getElementById('dashApply').addEventListener('click', function () {
+    syncQuickRange();
+    refreshAll();
+  });
+  document.getElementById('dashToday').addEventListener('click', function () {
+    var t = todayISO();
+    document.getElementById('dashFrom').value = t;
+    document.getElementById('dashTo').value = t;
+    syncQuickRange();
+    refreshAll();
+  });
+  document.getElementById('dashYesterday').addEventListener('click', function () {
+    var y = yesterdayISO();
+    document.getElementById('dashFrom').value = y;
+    document.getElementById('dashTo').value = y;
+    syncQuickRange();
+    refreshAll();
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    var t = todayISO();
+    document.getElementById('dashFrom').value = t;
+    document.getElementById('dashTo').value = t;
+    syncQuickRange();
+    refreshAll();
+  });
 })();
 </script>
 {% endblock %}

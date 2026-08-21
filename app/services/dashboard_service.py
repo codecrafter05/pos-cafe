@@ -10,7 +10,6 @@ from app.core.payments import payment_label
 from app.core.time import (
     as_bahrain,
     bahrain_range_utc,
-    period_bounds_utc,
     period_chart_dates,
 )
 from app.models.order import Order
@@ -52,8 +51,8 @@ def _summary_between(db: Session, start: datetime, end: datetime) -> SummaryRow:
     )
 
 
-def dashboard_summary(db: Session, *, period: Period) -> SummaryRow:
-    start, end = period_bounds_utc(period)
+def dashboard_summary(db: Session, *, date_from: date, date_to: date) -> SummaryRow:
+    start, end = bahrain_range_utc(date_from, date_to)
     return _summary_between(db, start, end)
 
 
@@ -176,15 +175,16 @@ def _products_between(
 def top_products(
     db: Session,
     *,
-    period: Period,
+    date_from: date,
+    date_to: date,
     limit: int = 10,
 ) -> list[dict]:
-    start, end = period_bounds_utc(period)
+    start, end = bahrain_range_utc(date_from, date_to)
     return _products_between(db, start, end, limit=limit)
 
 
-def peak_hours(db: Session, *, period: Period) -> list[dict]:
-    start, end = period_bounds_utc(period)
+def peak_hours(db: Session, *, date_from: date, date_to: date) -> list[dict]:
+    start, end = bahrain_range_utc(date_from, date_to)
     hour_expr = extract("hour", func.date_add(Order.created_at, text("INTERVAL 3 HOUR")))
     rows = (
         db.query(
@@ -244,9 +244,9 @@ def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]
     return out
 
 
-def waste_summary(db: Session, *, period: Period) -> dict:
-    """Wasted lines in the period: prepared but not sold (inventory not restocked)."""
-    start, end = period_bounds_utc(period)
+def waste_summary(db: Session, *, date_from: date, date_to: date) -> dict:
+    """Wasted lines in the range: prepared but not sold (inventory not restocked)."""
+    start, end = bahrain_range_utc(date_from, date_to)
     rows = (
         db.query(
             OrderItem.product_id.label("product_id"),

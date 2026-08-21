@@ -24,8 +24,10 @@
       <label class="form-label small text-secondary mb-1">To</label>
       <input type="date" class="form-control rounded-3" id="rptTo">
     </div>
-    <div class="col-md-6 text-md-end">
-      <button type="button" class="btn btn-grd-primary rounded-3 px-4 me-1" id="rptApply">Apply</button>
+    <div class="col-md-6 text-md-end d-flex flex-wrap justify-content-md-end gap-2">
+      <button type="button" class="btn btn-outline-secondary rounded-3" id="rptToday" aria-pressed="false">Today</button>
+      <button type="button" class="btn btn-outline-secondary rounded-3" id="rptYesterday" aria-pressed="false">Yesterday</button>
+      <button type="button" class="btn btn-grd-primary rounded-3 px-4" id="rptApply">Apply</button>
       <button type="button" class="btn btn-outline-secondary rounded-3 px-4" id="rptCsv">Export CSV</button>
     </div>
   </div>
@@ -136,6 +138,29 @@
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bahrain' });
   }
 
+  function yesterdayISO() {
+    var parts = todayISO().split('-');
+    var d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setQuickPressed(btn, on) {
+    if (!btn) return;
+    btn.classList.toggle('btn-grd-primary', on);
+    btn.classList.toggle('btn-outline-secondary', !on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function syncQuickRange() {
+    var from = document.getElementById('rptFrom').value;
+    var to = document.getElementById('rptTo').value;
+    var isToday = from && to && from === to && from === todayISO();
+    var isYest = from && to && from === to && from === yesterdayISO();
+    setQuickPressed(document.getElementById('rptToday'), isToday);
+    setQuickPressed(document.getElementById('rptYesterday'), isYest);
+  }
+
   function monthStartISO() {
     var t = todayISO();
     return t.slice(0, 8) + '01';
@@ -230,7 +255,24 @@
     });
   }
 
-  document.getElementById('rptApply').addEventListener('click', load);
+  document.getElementById('rptApply').addEventListener('click', function () {
+    syncQuickRange();
+    load();
+  });
+  document.getElementById('rptToday').addEventListener('click', function () {
+    var t = todayISO();
+    document.getElementById('rptFrom').value = t;
+    document.getElementById('rptTo').value = t;
+    syncQuickRange();
+    load();
+  });
+  document.getElementById('rptYesterday').addEventListener('click', function () {
+    var y = yesterdayISO();
+    document.getElementById('rptFrom').value = y;
+    document.getElementById('rptTo').value = y;
+    syncQuickRange();
+    load();
+  });
   document.getElementById('rptCsv').addEventListener('click', function () {
     if (!lastReport) { PodCafe.toast('Load a report first', 'warning'); return; }
     var lines = [];
@@ -270,6 +312,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('rptFrom').value = monthStartISO();
     document.getElementById('rptTo').value = todayISO();
+    syncQuickRange();
     load();
   });
 })();
