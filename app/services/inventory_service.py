@@ -68,6 +68,47 @@ def adjust_raw_material_stock(
     return rm
 
 
+def assert_sufficient_stock_for_product(
+    db: Session,
+    *,
+    product_id: int,
+    quantity: int,
+    reserved: dict[int, Decimal],
+) -> Decimal:
+    """Confirm recipe materials exist and stock covers this line plus earlier
+    lines in the same order. Does not deduct. ``reserved`` is mutated with
+    additional raw-material quantities this line would consume.
+    """
+    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
+    unit_cost = Decimal("0")
+    for line in lines:
+        rm = (
+            db.query(RawMaterial)
+            .filter(RawMaterial.id == line.raw_material_id)
+            .with_for_update()
+            .first()
+        )
+        if rm is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Recipe references missing raw material id {line.raw_material_id}",
+            )
+        qty_needed = line.quantity_used * Decimal(quantity)
+        already = reserved.get(rm.id, Decimal("0"))
+        required = already + qty_needed
+        if rm.current_stock < required:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Insufficient stock for “{rm.name}”: need {required} {rm.unit}, "
+                    f"have {rm.current_stock}"
+                ),
+            )
+        reserved[rm.id] = required
+        unit_cost += line.quantity_used * rm.cost_per_unit
+    return unit_cost
+
+
 def apply_sale_deduction_for_product(
     db: Session,
     *,

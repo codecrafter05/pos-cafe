@@ -72,28 +72,8 @@ def _create_order_from_items(
     device_id: str | None = None,
     created_at: datetime | None = None,
 ) -> Order:
-    order = Order(
-        user_id=user_id,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
-        customer_car_plate=customer_car_plate,
-        payment_method=payment_method,
-        source=source,
-        status=order_status,
-        notes=notes,
-        total_amount=Decimal("0"),
-        total_cost=Decimal("0"),
-        profit=Decimal("0"),
-        client_uuid=client_uuid,
-        device_id=device_id,
-    )
-    if created_at is not None:
-        order.created_at = created_at
-    db.add(order)
-    db.flush()
-
-    total_amount = Decimal("0")
-    total_cost = Decimal("0")
+    prepared: list[tuple[OrderItemIn, Product, Decimal]] = []
+    reserved: dict[int, Decimal] = {}
 
     for line in items:
         product = (
@@ -123,6 +103,38 @@ def _create_order_from_items(
             )
 
         extras = _extra_price_for_modifiers(db, product.id, line.modifiers)
+        inventory_service.assert_sufficient_stock_for_product(
+            db,
+            product_id=product.id,
+            quantity=line.quantity,
+            reserved=reserved,
+        )
+        prepared.append((line, product, extras))
+
+    order = Order(
+        user_id=user_id,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        customer_car_plate=customer_car_plate,
+        payment_method=payment_method,
+        source=source,
+        status=order_status,
+        notes=notes,
+        total_amount=Decimal("0"),
+        total_cost=Decimal("0"),
+        profit=Decimal("0"),
+        client_uuid=client_uuid,
+        device_id=device_id,
+    )
+    if created_at is not None:
+        order.created_at = created_at
+    db.add(order)
+    db.flush()
+
+    total_amount = Decimal("0")
+    total_cost = Decimal("0")
+
+    for line, product, extras in prepared:
         unit_price = product.price + extras
         line_revenue = unit_price * line.quantity
 
