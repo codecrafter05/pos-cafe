@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.modifier_recipe import ModifierRecipe
     from app.models.product import Product
 
 
@@ -20,3 +21,6 @@ class ProductModifier(Base):
     extra_price: Mapped[Decimal] = mapped_column(Numeric(10, 3), default=Decimal("0"), nullable=False)
 
     product: Mapped["Product"] = relationship("Product", back_populates="modifiers")
+    recipe_lines: Mapped[list["ModifierRecipe"]] = relationship(
+        "ModifierRecipe", back_populates="modifier", cascade="all, delete-orphan"
+    )

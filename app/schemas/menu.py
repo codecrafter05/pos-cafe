@@ -29,14 +29,32 @@ class CategoryOut(CategoryBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RecipeLineIn(BaseModel):
+    raw_material_id: int
+    quantity_used: Decimal
+    unit: str
+
+
+class RecipeLineOut(RecipeLineIn):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ModifierIn(BaseModel):
     group_name: str = Field(..., max_length=100)
     option_name: str = Field(..., max_length=100)
     extra_price: Decimal = Decimal("0")
+    recipe: list[RecipeLineIn] = []
 
 
-class ModifierOut(ModifierIn):
+class ModifierOut(BaseModel):
     id: int
+    group_name: str
+    option_name: str
+    extra_price: Decimal = Decimal("0")
+    recipe: list[RecipeLineOut] = []
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -62,18 +80,6 @@ class RawMaterialUpdate(BaseModel):
 class RawMaterialOut(RawMaterialBase):
     id: int
     created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class RecipeLineIn(BaseModel):
-    raw_material_id: int
-    quantity_used: Decimal
-    unit: str
-
-
-class RecipeLineOut(RecipeLineIn):
-    id: int
 
     model_config = ConfigDict(from_attributes=True)
 

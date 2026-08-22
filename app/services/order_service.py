@@ -35,25 +35,27 @@ def get_or_create_online_store_user(db: Session) -> User:
     return u
 
 
-def _extra_price_for_modifiers(
+def _resolve_selected_modifiers(
     db: Session, product_id: int, selected: list[OrderModifierSnapshot]
-) -> Decimal:
+) -> tuple[list[ProductModifier], Decimal]:
     if not selected:
-        return Decimal("0")
-    existing: dict[tuple[str, str], Decimal] = {
-        (m.group_name, m.option_name): m.extra_price
+        return [], Decimal("0")
+    existing: dict[tuple[str, str], ProductModifier] = {
+        (m.group_name, m.option_name): m
         for m in db.query(ProductModifier).filter(ProductModifier.product_id == product_id).all()
     }
+    resolved: list[ProductModifier] = []
     extras = Decimal("0")
-    for mod in selected:
-        key = (mod.group_name, mod.option_name)
+    for snap in selected:
+        key = (snap.group_name, snap.option_name)
         if key not in existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid modifier {key[0]!r} / {key[1]!r} for this product",
             )
-        extras += existing[key]
-    return extras
+        resolved.append(existing[key])
+        extras += existing[key].extra_price
+    return resolved, extras
 
 
 def _create_order_from_items(
@@ -72,7 +74,7 @@ def _create_order_from_items(
     device_id: str | None = None,
     created_at: datetime | None = None,
 ) -> Order:
-    prepared: list[tuple[OrderItemIn, Product, Decimal]] = []
+    prepared: list[tuple[OrderItemIn, Product, Decimal, list[ProductModifier]]] = []
     reserved: dict[int, Decimal] = {}
 
     for line in items:
@@ -102,14 +104,20 @@ def _create_order_from_items(
                 ),
             )
 
-        extras = _extra_price_for_modifiers(db, product.id, line.modifiers)
+        resolved_mods, extras = _resolve_selected_modifiers(db, product.id, line.modifiers)
         inventory_service.assert_sufficient_stock_for_product(
             db,
             product_id=product.id,
             quantity=line.quantity,
             reserved=reserved,
         )
-        prepared.append((line, product, extras))
+        inventory_service.assert_sufficient_stock_for_modifiers(
+            db,
+            modifiers=resolved_mods,
+            quantity=line.quantity,
+            reserved=reserved,
+        )
+        prepared.append((line, product, extras, resolved_mods))
 
     order = Order(
         user_id=user_id,
@@ -134,7 +142,7 @@ def _create_order_from_items(
     total_amount = Decimal("0")
     total_cost = Decimal("0")
 
-    for line, product, extras in prepared:
+    for line, product, extras, resolved_mods in prepared:
         unit_price = product.price + extras
         line_revenue = unit_price * line.quantity
 
@@ -155,6 +163,13 @@ def _create_order_from_items(
         unit_cost = inventory_service.apply_sale_deduction_for_product(
             db,
             product_id=product.id,
+            quantity=line.quantity,
+            order_id=order.id,
+            order_item_id=item.id,
+        )
+        unit_cost += inventory_service.apply_sale_deduction_for_modifiers(
+            db,
+            modifiers=resolved_mods,
             quantity=line.quantity,
             order_id=order.id,
             order_item_id=item.id,

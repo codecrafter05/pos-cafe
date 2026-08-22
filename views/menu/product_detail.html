@@ -72,7 +72,7 @@
           <h5 class="fw-bold mb-0">Modifiers</h5>
           <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="modAddRow">Add option</button>
         </div>
-        <p class="text-secondary small mb-3">Grouped options (e.g. Size → Large) with optional extra price.</p>
+        <p class="text-secondary small mb-3">Grouped options (e.g. Size → Large) with optional extra price. Link an ingredient only when that option should consume extra stock.</p>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead><tr><th>Group</th><th>Option</th><th class="text-end">+ Price</th><th></th></tr></thead>
@@ -109,6 +109,76 @@
 
   function rowDelBtn(cls) {
     return '<button type="button" class="btn btn-sm btn-outline-danger border-0 ' + cls + '"><i class="material-icons-outlined" style="font-size:18px">close</i></button>';
+  }
+
+  function escAttr(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  }
+
+  function matOptions(selectedId) {
+    return mats.map(function (x) {
+      return '<option value="' + x.id + '"' + (selectedId && Number(selectedId) === x.id ? ' selected' : '') + '>' + escAttr(x.name) + '</option>';
+    }).join('');
+  }
+
+  function addIngLine(container, mid, q, u) {
+    var row = document.createElement('div');
+    row.className = 'd-flex flex-wrap gap-2 align-items-center mb-2 mod-ing-line';
+    var uid = mid || (mats[0] && mats[0].id);
+    var unit = u || '';
+    if (!unit && uid) {
+      var found = mats.find(function (x) { return x.id === Number(uid); });
+      unit = (found && found.unit) || '';
+    }
+    row.innerHTML =
+      '<select class="form-select form-select-sm rounded-3 mod-ing-m" style="min-width:11rem">' +
+        (mats.length ? matOptions(uid) : '<option value="">No materials</option>') +
+      '</select>' +
+      '<input type="number" step="0.001" min="0" class="form-control form-control-sm text-end rounded-3 mod-ing-q" style="width:6.5rem" placeholder="Qty" value="' + escAttr(q == null || q === '' ? '' : q) + '">' +
+      '<input class="form-control form-control-sm rounded-3 mod-ing-u" style="width:5.5rem" placeholder="Unit" value="' + escAttr(unit) + '">' +
+      '<button type="button" class="btn btn-sm btn-outline-danger border-0 mod-ing-del" aria-label="Remove ingredient"><i class="material-icons-outlined" style="font-size:18px">close</i></button>';
+    container.appendChild(row);
+  }
+
+  function setIngOpen(mainTr, open) {
+    var next = mainTr.nextElementSibling;
+    if (!next || !next.classList.contains('mod-ings')) return;
+    next.classList.toggle('d-none', !open);
+    var btn = mainTr.querySelector('.mod-link-ing');
+    if (btn) btn.textContent = open ? 'Hide ingredients' : '+ Link ingredient';
+  }
+
+  function addModRow(g, o, price, recipeLines) {
+    var tbody = document.getElementById('modRows');
+    var lines = recipeLines || [];
+    var hasIng = lines.length > 0;
+    var tr = document.createElement('tr');
+    tr.className = 'mod-main';
+    tr.innerHTML =
+      '<td><input class="form-control form-control-sm rounded-3 mod-g" value="' + escAttr(g || '') + '"></td>' +
+      '<td><input class="form-control form-control-sm rounded-3 mod-o" value="' + escAttr(o || '') + '"></td>' +
+      '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 mod-p" value="' + escAttr(price || 0) + '"></td>' +
+      '<td class="text-nowrap">' +
+        '<button type="button" class="btn btn-sm btn-link px-0 me-2 mod-link-ing">' + (hasIng ? 'Hide ingredients' : '+ Link ingredient') + '</button>' +
+        rowDelBtn('mod-del') +
+      '</td>';
+    var tr2 = document.createElement('tr');
+    tr2.className = 'mod-ings' + (hasIng ? '' : ' d-none');
+    tr2.innerHTML =
+      '<td colspan="4" class="pt-0">' +
+        '<div class="small text-secondary mb-2">Optional extra ingredients consumed when this option is selected.</div>' +
+        '<div class="mod-ing-lines"></div>' +
+        '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 mod-ing-add">Add ingredient</button>' +
+      '</td>';
+    tbody.appendChild(tr);
+    tbody.appendChild(tr2);
+    var box = tr2.querySelector('.mod-ing-lines');
+    lines.forEach(function (r) {
+      addIngLine(box, r.raw_material_id, r.quantity_used, r.unit);
+    });
   }
 
   function getProductId() {
@@ -315,15 +385,8 @@
         document.getElementById('prodStoredImageUrl').value = incomingImg;
       }
       refreshImagePreview(false);
-      var modB = document.getElementById('modRows');
       (pr.modifiers || []).forEach(function (m) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td><input class="form-control form-control-sm rounded-3 mod-g" value="' + m.group_name.replace(/"/g, '&quot;') + '"></td>' +
-          '<td><input class="form-control form-control-sm rounded-3 mod-o" value="' + m.option_name.replace(/"/g, '&quot;') + '"></td>' +
-          '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 mod-p" value="' + m.extra_price + '"></td>' +
-          '<td>' + rowDelBtn('mod-del') + '</td>';
-        modB.appendChild(tr);
+        addModRow(m.group_name, m.option_name, m.extra_price, m.recipe || []);
       });
       var recB = document.getElementById('recRows');
       (pr.recipe || []).forEach(function (r) {
@@ -349,16 +412,6 @@
 
     syncImageUi();
 
-    function addModRow(g, o, price) {
-      var modB = document.getElementById('modRows');
-      var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td><input class="form-control form-control-sm rounded-3 mod-g" value="' + (g || '') + '"></td>' +
-        '<td><input class="form-control form-control-sm rounded-3 mod-o" value="' + (o || '') + '"></td>' +
-        '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 mod-p" value="' + (price || 0) + '"></td>' +
-        '<td>' + rowDelBtn('mod-del') + '</td>';
-      modB.appendChild(tr);
-    }
     function addRecRow(mid, q, u) {
       var recB = document.getElementById('recRows');
       if (!mats.length) return;
@@ -379,7 +432,47 @@
     document.getElementById('recAddRow').addEventListener('click', function () { addRecRow(mats[0] && mats[0].id, 1, mats[0] && mats[0].unit); });
 
     document.getElementById('modRows').addEventListener('click', function (e) {
-      if (e.target.closest('.mod-del')) e.target.closest('tr').remove();
+      var del = e.target.closest('.mod-del');
+      if (del) {
+        var main = del.closest('tr.mod-main');
+        if (main) {
+          var next = main.nextElementSibling;
+          if (next && next.classList.contains('mod-ings')) next.remove();
+          main.remove();
+        }
+        return;
+      }
+      var link = e.target.closest('.mod-link-ing');
+      if (link) {
+        var main = link.closest('tr.mod-main');
+        var next = main && main.nextElementSibling;
+        var opening = next && next.classList.contains('d-none');
+        setIngOpen(main, opening);
+        if (opening && next) {
+          var box = next.querySelector('.mod-ing-lines');
+          if (box && !box.querySelector('.mod-ing-line') && mats.length) addIngLine(box);
+        }
+        return;
+      }
+      if (e.target.closest('.mod-ing-del')) {
+        var line = e.target.closest('.mod-ing-line');
+        if (line) line.remove();
+        return;
+      }
+      if (e.target.closest('.mod-ing-add')) {
+        var wrap = e.target.closest('tr.mod-ings');
+        var box = wrap && wrap.querySelector('.mod-ing-lines');
+        if (!box) return;
+        if (mats.length) addIngLine(box);
+        else PodCafe.toast('Add a raw material first.', 'warning');
+      }
+    });
+    document.getElementById('modRows').addEventListener('change', function (e) {
+      if (!e.target.classList.contains('mod-ing-m')) return;
+      var id = Number(e.target.value);
+      var found = mats.find(function (x) { return x.id === id; });
+      var unitInput = e.target.closest('.mod-ing-line').querySelector('.mod-ing-u');
+      if (found && unitInput && !unitInput.value.trim()) unitInput.value = found.unit;
     });
     document.getElementById('recRows').addEventListener('click', function (e) {
       if (e.target.closest('.rec-del')) e.target.closest('tr').remove();
@@ -471,11 +564,23 @@
 
     function collectMods() {
       var out = [];
-      document.querySelectorAll('#modRows tr').forEach(function (tr) {
+      document.querySelectorAll('#modRows tr.mod-main').forEach(function (tr) {
         var g = tr.querySelector('.mod-g').value.trim();
         var o = tr.querySelector('.mod-o').value.trim();
         var p = tr.querySelector('.mod-p').value || '0';
-        if (g && o) out.push({ group_name: g, option_name: o, extra_price: String(p) });
+        if (!g || !o) return;
+        var recipe = [];
+        var next = tr.nextElementSibling;
+        if (next && next.classList.contains('mod-ings')) {
+          next.querySelectorAll('.mod-ing-line').forEach(function (row) {
+            var mid = Number(row.querySelector('.mod-ing-m').value);
+            var q = row.querySelector('.mod-ing-q').value;
+            var u = row.querySelector('.mod-ing-u').value.trim();
+            if (!mid || !u || !q || Number(q) <= 0) return;
+            recipe.push({ raw_material_id: mid, quantity_used: String(q), unit: u });
+          });
+        }
+        out.push({ group_name: g, option_name: o, extra_price: String(p), recipe: recipe });
       });
       return out;
     }

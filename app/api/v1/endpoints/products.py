@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.core.paths import PRODUCT_UPLOAD_DIR
+from app.models.modifier_recipe import ModifierRecipe
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.product_modifier import ProductModifier
@@ -52,6 +54,16 @@ def _ensure_upload_dir() -> None:
     PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _modifier_out(m: ProductModifier) -> ModifierOut:
+    return ModifierOut(
+        id=m.id,
+        group_name=m.group_name,
+        option_name=m.option_name,
+        extra_price=m.extra_price,
+        recipe=[RecipeLineOut.model_validate(r) for r in m.recipe_lines],
+    )
+
+
 def _to_out(p: Product) -> ProductOut:
     return ProductOut(
         id=p.id,
@@ -65,15 +77,48 @@ def _to_out(p: Product) -> ProductOut:
         is_active=p.is_active,
         sort_order=p.sort_order,
         created_at=p.created_at,
-        modifiers=[ModifierOut.model_validate(m) for m in p.modifiers],
+        modifiers=[_modifier_out(m) for m in p.modifiers],
         recipe=[RecipeLineOut.model_validate(r) for r in p.recipe_lines],
     )
+
+
+def _modifier_load_options():
+    return joinedload(Product.modifiers).joinedload(ProductModifier.recipe_lines)
+
+
+def _persist_modifiers(db: Session, product_id: int, mods) -> None:
+    for m in mods:
+        data = m.model_dump() if hasattr(m, "model_dump") else dict(m)
+        recipe = data.pop("recipe", None) or []
+        mod = ProductModifier(
+            product_id=product_id,
+            group_name=data["group_name"],
+            option_name=data["option_name"],
+            extra_price=data["extra_price"],
+        )
+        db.add(mod)
+        db.flush()
+        for line in recipe:
+            ld = line.model_dump() if hasattr(line, "model_dump") else dict(line)
+            qty = Decimal(str(ld.get("quantity_used") or 0))
+            unit = str(ld.get("unit") or "").strip()
+            raw_id = ld.get("raw_material_id")
+            if not raw_id or qty <= 0 or not unit:
+                continue
+            db.add(
+                ModifierRecipe(
+                    modifier_id=mod.id,
+                    raw_material_id=int(raw_id),
+                    quantity_used=qty,
+                    unit=unit,
+                )
+            )
 
 
 def _load_product(db: Session, product_id: int) -> Product:
     p = (
         db.query(Product)
-        .options(joinedload(Product.modifiers), joinedload(Product.recipe_lines))
+        .options(_modifier_load_options(), joinedload(Product.recipe_lines))
         .filter(Product.id == product_id)
         .first()
     )
@@ -90,7 +135,7 @@ def list_products(
     _: User = Depends(_staff),
 ):
     q = db.query(Product).options(
-        joinedload(Product.modifiers),
+        _modifier_load_options(),
         joinedload(Product.recipe_lines),
     )
     if category_id is not None:
@@ -121,8 +166,7 @@ def create_product(
     p = Product(**data)
     db.add(p)
     db.flush()
-    for m in body.modifiers:
-        db.add(ProductModifier(product_id=p.id, **m.model_dump()))
+    _persist_modifiers(db, p.id, body.modifiers)
     db.flush()
     recompute_product_cost_price(db, p.id)
     db.commit()
@@ -208,8 +252,7 @@ def update_product(
         db.query(ProductModifier).filter(ProductModifier.product_id == p.id).delete(
             synchronize_session=False
         )
-        for m in mods:
-            db.add(ProductModifier(product_id=p.id, **m))
+        _persist_modifiers(db, p.id, mods)
     db.flush()
     recompute_product_cost_price(db, p.id)
     db.commit()
