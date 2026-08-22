@@ -22,6 +22,8 @@ class OrderItem(Base):
     unit_cost: Mapped[Decimal] = mapped_column(Numeric(10, 3), default=Decimal("0"), nullable=False)
     modifiers_snapshot: Mapped[list[Any] | dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # sold | cancelled | wasted
+    line_status: Mapped[str] = mapped_column(String(20), default="sold", nullable=False)
 
     order: Mapped["Order"] = relationship("Order", back_populates="items")
     product: Mapped["Product"] = relationship("Product")

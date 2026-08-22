@@ -12,7 +12,8 @@ class DashboardSummaryOut(BaseModel):
     net_profit: Decimal
     orders_count: int
     avg_order_value: Decimal
-    period: Period
+    date_from: str
+    date_to: str
 
 
 class SalesChartPointOut(BaseModel):
@@ -32,6 +33,25 @@ class TopProductOut(BaseModel):
 class PeakHourOut(BaseModel):
     hour: int
     orders: int
+
+
+class WasteProductOut(BaseModel):
+    product_id: int
+    name: str
+    name_ar: str | None
+    units: int
+    lost_retail: Decimal
+    lost_cost: Decimal
+
+
+class WasteSummaryOut(BaseModel):
+    items_count: int
+    products_count: int
+    lost_retail: Decimal
+    lost_cost: Decimal
+    products: list[WasteProductOut]
+    date_from: str
+    date_to: str
 
 
 class ReportDayOut(BaseModel):

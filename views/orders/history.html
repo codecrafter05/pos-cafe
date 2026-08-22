@@ -2,17 +2,7 @@
 {% block title %}{{ shop.cafe_name }} — Order history{% endblock %}
 
 {% block content %}
-<div class="page-breadcrumb d-none d-sm-flex align-items-center mb-3">
-  <div class="breadcrumb-title pe-3">Orders</div>
-  <div class="ps-3">
-    <nav aria-label="breadcrumb">
-      <ol class="breadcrumb mb-0 p-0">
-        <li class="breadcrumb-item"><a href="/dashboard"><i class="material-icons-outlined">home</i></a></li>
-        <li class="breadcrumb-item active" aria-current="page">History</li>
-      </ol>
-    </nav>
-  </div>
-</div>
+<h5 class="mb-3">History</h5>
 
 <div class="card rounded-4 mb-3">
   <div class="card-body row g-2 align-items-end">
@@ -35,7 +25,9 @@
         <option value="cancelled">cancelled</option>
       </select>
     </div>
-    <div class="col-md-3 text-md-end">
+    <div class="col-md-3 text-md-end d-flex flex-wrap justify-content-md-end gap-2">
+      <button type="button" class="btn btn-outline-secondary rounded-3" id="fltToday" aria-pressed="false">Today</button>
+      <button type="button" class="btn btn-outline-secondary rounded-3" id="fltYesterday" aria-pressed="false">Yesterday</button>
       <button type="button" class="btn btn-grd-primary rounded-3 px-4" id="fltApply">Apply</button>
     </div>
   </div>
@@ -76,7 +68,7 @@
         <h6 class="fw-bold mb-2">Line items</h6>
         <div class="table-responsive">
           <table class="table table-sm align-middle mb-0">
-            <thead><tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Unit</th><th class="text-end">Line</th></tr></thead>
+            <thead><tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Unit</th><th class="text-end">Line</th><th class="text-end">Actions</th></tr></thead>
             <tbody id="viewItems"></tbody>
           </table>
         </div>
@@ -121,6 +113,33 @@
 (function () {
   function esc(s) { return String(s||'').replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }); }
 
+  function todayISO() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bahrain' });
+  }
+
+  function yesterdayISO() {
+    var parts = todayISO().split('-');
+    var d = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function setQuickPressed(btn, on) {
+    if (!btn) return;
+    btn.classList.toggle('btn-grd-primary', on);
+    btn.classList.toggle('btn-outline-secondary', !on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  function syncQuickRange() {
+    var from = document.getElementById('fltFrom').value;
+    var to = document.getElementById('fltTo').value;
+    var isToday = from && to && from === to && from === todayISO();
+    var isYest = from && to && from === to && from === yesterdayISO();
+    setQuickPressed(document.getElementById('fltToday'), isToday);
+    setQuickPressed(document.getElementById('fltYesterday'), isYest);
+  }
+
   function fmtWhen(iso) {
     try {
       var d = new Date(iso);
@@ -141,13 +160,14 @@
     }).join('') + '</ul>';
   }
 
-  async function openView(id) {
-    var res = await PodCafe.apiFetch('/api/v1/orders/' + encodeURIComponent(id));
-    if (!res.ok) {
-      PodCafe.toast('Could not load order', 'danger');
-      return;
-    }
-    var o = await res.json();
+  var viewOrderId = null;
+
+  function lineStatusOf(it) {
+    return String(it.line_status || 'sold');
+  }
+
+  function renderView(o) {
+    viewOrderId = o.id;
     document.getElementById('viewModalTitle').textContent = 'Order #' + o.id;
     var meta = document.getElementById('viewMeta');
     meta.innerHTML =
@@ -167,15 +187,37 @@
     tb.innerHTML = '';
     (o.items || []).forEach(function (it) {
       var tr = document.createElement('tr');
+      var st = lineStatusOf(it);
       var pname = it.product_name || ('Product #' + it.product_id);
       var line = Number(it.unit_price) * Number(it.quantity);
+      var badge = '';
+      if (st === 'wasted') badge = ' <span class="badge rounded-2 bg-warning bg-opacity-25 text-warning">waste</span>';
+      if (st === 'cancelled') badge = ' <span class="badge rounded-2 bg-secondary bg-opacity-25 text-secondary">cancelled</span>';
+      if (st !== 'sold') tr.classList.add('text-secondary');
+      var actions = '—';
+      if (st === 'sold') {
+        actions =
+          '<button type="button" class="btn btn-sm btn-outline-warning rounded-3 me-1 js-line-waste" data-item="' + it.id + '">Waste</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 js-line-cancel" data-item="' + it.id + '">Cancel</button>';
+      }
       tr.innerHTML =
-        '<td><div class="fw-semibold">' + esc(pname) + '</div>' + modsHtml(it.modifiers_snapshot) +
+        '<td><div class="fw-semibold">' + esc(pname) + badge + '</div>' + modsHtml(it.modifiers_snapshot) +
         (it.notes ? '<div class="small text-secondary mt-1">' + esc(it.notes) + '</div>' : '') + '</td>' +
         '<td class="text-center">' + it.quantity + '</td>' +
         '<td class="text-end">' + PodCafe.currency(it.unit_price) + '</td>' +
-        '<td class="text-end fw-semibold">' + PodCafe.currency(line) + '</td>';
+        '<td class="text-end fw-semibold">' + (st === 'sold' ? PodCafe.currency(line) : '—') + '</td>' +
+        '<td class="text-end text-nowrap">' + actions + '</td>';
       tb.appendChild(tr);
+    });
+    tb.querySelectorAll('.js-line-waste').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setLineStatus(btn.getAttribute('data-item'), 'wasted');
+      });
+    });
+    tb.querySelectorAll('.js-line-cancel').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setLineStatus(btn.getAttribute('data-item'), 'cancelled');
+      });
     });
     var nn = document.getElementById('viewNotes');
     if (o.notes) {
@@ -186,6 +228,38 @@
       nn.classList.add('d-none');
     }
     document.getElementById('viewPrintBtn').href = '/orders/' + encodeURIComponent(o.id) + '/receipt';
+  }
+
+  async function setLineStatus(itemId, status) {
+    if (!viewOrderId) return;
+    var msg = status === 'wasted'
+      ? 'Mark this item as waste? It was prepared and will not go back to inventory. Order totals will drop this sale and keep the ingredient cost as a loss.'
+      : 'Cancel this item? Ingredients will be returned to inventory and it will be removed from the order total.';
+    if (!window.confirm(msg)) return;
+    var res = await PodCafe.apiFetch(
+      '/api/v1/orders/' + encodeURIComponent(viewOrderId) + '/items/' + encodeURIComponent(itemId) + '/status',
+      { method: 'PUT', body: JSON.stringify({ status: status }) }
+    );
+    if (!res.ok) {
+      var d = await res.json().catch(function () { return {}; });
+      var detail = d.detail;
+      PodCafe.toast(typeof detail === 'string' ? detail : 'Could not update item', 'danger');
+      return;
+    }
+    var o = await res.json();
+    renderView(o);
+    PodCafe.toast(status === 'wasted' ? 'Item marked as waste' : 'Item cancelled', 'success');
+    load();
+  }
+
+  async function openView(id) {
+    var res = await PodCafe.apiFetch('/api/v1/orders/' + encodeURIComponent(id));
+    if (!res.ok) {
+      PodCafe.toast('Could not load order', 'danger');
+      return;
+    }
+    var o = await res.json();
+    renderView(o);
     new bootstrap.Modal(document.getElementById('viewModal')).show();
   }
 
@@ -219,7 +293,11 @@
         '<td><span class="badge rounded-2 ' +
         (r.source === 'online' ? 'bg-info bg-opacity-25 text-info' : 'bg-light text-secondary') +
         '">' + esc(r.source || 'pos') + '</span></td>' +
-        '<td><span class="badge bg-secondary bg-opacity-10 text-secondary rounded-2">' + esc(r.status) + '</span></td>' +
+        '<td><span class="badge rounded-2 ' +
+        (String(r.status) === 'cancelled'
+          ? 'bg-danger bg-opacity-10 text-danger'
+          : 'bg-secondary bg-opacity-10 text-secondary') +
+        '">' + esc(r.status) + '</span></td>' +
         '<td class="text-end text-nowrap">' +
           '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 me-1 js-view" data-id="' + r.id + '" title="عرض التفاصيل">View</button>' +
           '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 js-st" data-id="' + r.id + '" data-status="' + stVal + '">Status</button>' +
@@ -241,7 +319,24 @@
     });
   }
 
-  document.getElementById('fltApply').addEventListener('click', load);
+  document.getElementById('fltApply').addEventListener('click', function () {
+    syncQuickRange();
+    load();
+  });
+  document.getElementById('fltToday').addEventListener('click', function () {
+    var t = todayISO();
+    document.getElementById('fltFrom').value = t;
+    document.getElementById('fltTo').value = t;
+    syncQuickRange();
+    load();
+  });
+  document.getElementById('fltYesterday').addEventListener('click', function () {
+    var y = yesterdayISO();
+    document.getElementById('fltFrom').value = y;
+    document.getElementById('fltTo').value = y;
+    syncQuickRange();
+    load();
+  });
   document.getElementById('stSave').addEventListener('click', async function () {
     var id = document.getElementById('stOrderId').value;
     var st = document.getElementById('stVal').value;

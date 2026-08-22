@@ -16,6 +16,7 @@ def record_movement(
     movement_type: str,
     quantity: Decimal,
     order_id: int | None = None,
+    order_item_id: int | None = None,
     notes: str | None = None,
 ) -> InventoryMovement:
     movement = InventoryMovement(
@@ -23,6 +24,7 @@ def record_movement(
         movement_type=movement_type,
         quantity=quantity,
         order_id=order_id,
+        order_item_id=order_item_id,
         notes=notes,
     )
     db.add(movement)
@@ -36,6 +38,7 @@ def adjust_raw_material_stock(
     quantity_delta: Decimal,
     movement_type: str = "manual_adjustment",
     order_id: int | None = None,
+    order_item_id: int | None = None,
     notes: str | None = None,
 ) -> RawMaterial:
     rm = (
@@ -59,6 +62,7 @@ def adjust_raw_material_stock(
         movement_type=movement_type,
         quantity=quantity_delta,
         order_id=order_id,
+        order_item_id=order_item_id,
         notes=notes,
     )
     return rm
@@ -70,6 +74,7 @@ def apply_sale_deduction_for_product(
     product_id: int,
     quantity: int,
     order_id: int,
+    order_item_id: int | None = None,
 ) -> Decimal:
     """Deduct recipe materials for ``quantity`` units of ``product_id``. Returns unit cost (one unit)."""
     lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
@@ -103,18 +108,92 @@ def apply_sale_deduction_for_product(
             movement_type="sale_deduction",
             quantity=-qty_needed,
             order_id=order_id,
+            order_item_id=order_item_id,
             notes=f"Sale: product {product_id} × {quantity}",
         )
     return unit_cost
 
 
+def reverse_sale_deductions_for_item(db: Session, *, item) -> None:
+    """Restore stock for one cancelled line. No-op for waste. Idempotent per item."""
+    from app.models.order_item import OrderItem
+
+    if not isinstance(item, OrderItem):
+        return
+    if (item.line_status or "sold") == "wasted":
+        return
+    order_id = item.order_id
+    tag = f"item #{item.id}"
+    already = (
+        db.query(InventoryMovement.id)
+        .filter(
+            InventoryMovement.order_id == order_id,
+            InventoryMovement.movement_type == "cancellation_reversal",
+            InventoryMovement.notes.contains(tag),
+        )
+        .first()
+    )
+    if already is not None:
+        return
+
+    linked = (
+        db.query(InventoryMovement)
+        .filter(
+            InventoryMovement.order_id == order_id,
+            InventoryMovement.movement_type == "sale_deduction",
+            InventoryMovement.order_item_id == item.id,
+        )
+        .all()
+    )
+    if linked:
+        deductions = linked
+    else:
+        expected_notes = f"Sale: product {item.product_id} × {item.quantity}"
+        deductions = (
+            db.query(InventoryMovement)
+            .filter(
+                InventoryMovement.order_id == order_id,
+                InventoryMovement.movement_type == "sale_deduction",
+                InventoryMovement.order_item_id.is_(None),
+                InventoryMovement.notes == expected_notes,
+            )
+            .all()
+        )
+
+    for mov in deductions:
+        restore_qty = -mov.quantity
+        if restore_qty == 0:
+            continue
+        adjust_raw_material_stock(
+            db,
+            raw_material_id=mov.raw_material_id,
+            quantity_delta=restore_qty,
+            movement_type="cancellation_reversal",
+            order_id=order_id,
+            order_item_id=item.id,
+            notes=f"Cancellation of order #{order_id} {tag} (reverses movement #{mov.id})",
+        )
+
+
 def reverse_sale_deductions_for_order(db: Session, *, order_id: int) -> None:
     """Restore stock for a cancelled order.
 
-    Reverses the original ``sale_deduction`` movements (not the current recipe),
-    so later recipe edits do not change what is put back. Idempotent: if any
-    ``cancellation_reversal`` row already exists for this order, this is a no-op.
+    Reverses original ``sale_deduction`` movements for lines that are still sold.
+    Wasted lines are left deducted (food was prepared). Already-cancelled lines
+    are skipped. Idempotent per line.
     """
+    from app.models.order_item import OrderItem
+
+    items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
+    if items:
+        for item in items:
+            status = item.line_status or "sold"
+            if status in ("wasted", "cancelled"):
+                continue
+            reverse_sale_deductions_for_item(db, item=item)
+            item.line_status = "cancelled"
+        return
+
     already = (
         db.query(InventoryMovement.id)
         .filter(

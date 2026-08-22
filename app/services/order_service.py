@@ -126,26 +126,30 @@ def _create_order_from_items(
         unit_price = product.price + extras
         line_revenue = unit_price * line.quantity
 
+        snapshot = [m.model_dump(mode="json") for m in line.modifiers]
+        item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            quantity=line.quantity,
+            unit_price=unit_price,
+            unit_cost=Decimal("0"),
+            modifiers_snapshot=snapshot or None,
+            notes=line.notes,
+            line_status="sold",
+        )
+        db.add(item)
+        db.flush()
+
         unit_cost = inventory_service.apply_sale_deduction_for_product(
             db,
             product_id=product.id,
             quantity=line.quantity,
             order_id=order.id,
+            order_item_id=item.id,
         )
+        item.unit_cost = unit_cost
         line_cost = unit_cost * Decimal(line.quantity)
 
-        snapshot = [m.model_dump(mode="json") for m in line.modifiers]
-        db.add(
-            OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                quantity=line.quantity,
-                unit_price=unit_price,
-                unit_cost=unit_cost,
-                modifiers_snapshot=snapshot or None,
-                notes=line.notes,
-            )
-        )
         total_amount += line_revenue
         total_cost += line_cost
 
@@ -239,3 +243,54 @@ def recompute_product_cost_price(db: Session, product_id: int) -> None:
             continue
         total += line.quantity_used * rm.cost_per_unit
     product.cost_price = total
+
+
+def recompute_order_totals(db: Session, order: Order) -> Order:
+    """Sold lines count as revenue; wasted lines keep cost (no restock); cancelled drop both."""
+    total_amount = Decimal("0")
+    total_cost = Decimal("0")
+    sold = 0
+    wasted = 0
+    cancelled = 0
+    for item in order.items:
+        status = item.line_status or "sold"
+        line_price = item.unit_price * Decimal(item.quantity)
+        line_cost = item.unit_cost * Decimal(item.quantity)
+        if status == "cancelled":
+            cancelled += 1
+            continue
+        if status == "wasted":
+            wasted += 1
+            total_cost += line_cost
+            continue
+        sold += 1
+        total_amount += line_price
+        total_cost += line_cost
+    order.total_amount = total_amount
+    order.total_cost = total_cost
+    order.profit = total_amount - total_cost
+    if sold == 0 and wasted == 0 and cancelled > 0:
+        order.status = "cancelled"
+    db.flush()
+    return order
+
+
+def set_order_item_line_status(db: Session, *, order: Order, item: OrderItem, new_status: str) -> Order:
+    current = item.line_status or "sold"
+    if new_status not in ("cancelled", "wasted"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Line status must be cancelled or wasted",
+        )
+    if current == new_status:
+        return order
+    if current in ("cancelled", "wasted"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This item is already {current}",
+        )
+    if new_status == "cancelled":
+        inventory_service.reverse_sale_deductions_for_item(db, item=item)
+    item.line_status = new_status
+    db.flush()
+    return recompute_order_totals(db, order)

@@ -10,7 +10,6 @@ from app.core.payments import payment_label
 from app.core.time import (
     as_bahrain,
     bahrain_range_utc,
-    period_bounds_utc,
     period_chart_dates,
 )
 from app.models.order import Order
@@ -52,8 +51,8 @@ def _summary_between(db: Session, start: datetime, end: datetime) -> SummaryRow:
     )
 
 
-def dashboard_summary(db: Session, *, period: Period) -> SummaryRow:
-    start, end = period_bounds_utc(period)
+def dashboard_summary(db: Session, *, date_from: date, date_to: date) -> SummaryRow:
+    start, end = bahrain_range_utc(date_from, date_to)
     return _summary_between(db, start, end)
 
 
@@ -142,6 +141,7 @@ def _products_between(
             Order.created_at >= start,
             Order.created_at < end,
             Order.status != "cancelled",
+            OrderItem.line_status == "sold",
         )
         .group_by(OrderItem.product_id)
         .subquery()
@@ -175,15 +175,16 @@ def _products_between(
 def top_products(
     db: Session,
     *,
-    period: Period,
+    date_from: date,
+    date_to: date,
     limit: int = 10,
 ) -> list[dict]:
-    start, end = period_bounds_utc(period)
+    start, end = bahrain_range_utc(date_from, date_to)
     return _products_between(db, start, end, limit=limit)
 
 
-def peak_hours(db: Session, *, period: Period) -> list[dict]:
-    start, end = period_bounds_utc(period)
+def peak_hours(db: Session, *, date_from: date, date_to: date) -> list[dict]:
+    start, end = bahrain_range_utc(date_from, date_to)
     hour_expr = extract("hour", func.date_add(Order.created_at, text("INTERVAL 3 HOUR")))
     rows = (
         db.query(
@@ -241,6 +242,60 @@ def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]
     ]
     out.sort(key=lambda r: r["revenue"], reverse=True)
     return out
+
+
+def waste_summary(db: Session, *, date_from: date, date_to: date) -> dict:
+    """Wasted lines in the range: prepared but not sold (inventory not restocked)."""
+    start, end = bahrain_range_utc(date_from, date_to)
+    rows = (
+        db.query(
+            OrderItem.product_id.label("product_id"),
+            func.sum(OrderItem.quantity).label("units"),
+            func.coalesce(func.sum(OrderItem.unit_price * OrderItem.quantity), 0).label("retail"),
+            func.coalesce(func.sum(OrderItem.unit_cost * OrderItem.quantity), 0).label("cost"),
+        )
+        .join(Order, Order.id == OrderItem.order_id)
+        .filter(
+            Order.created_at >= start,
+            Order.created_at < end,
+            OrderItem.line_status == "wasted",
+        )
+        .group_by(OrderItem.product_id)
+        .subquery()
+    )
+    q = (
+        db.query(Product, rows.c.units, rows.c.retail, rows.c.cost)
+        .join(rows, Product.id == rows.c.product_id)
+        .order_by(rows.c.cost.desc())
+    )
+    products = []
+    items_count = 0
+    lost_retail = Decimal("0")
+    lost_cost = Decimal("0")
+    for p, units, retail, cost in q.all():
+        qty = int(units or 0)
+        rev = Decimal(str(retail or 0))
+        cst = Decimal(str(cost or 0))
+        items_count += qty
+        lost_retail += rev
+        lost_cost += cst
+        products.append(
+            {
+                "product_id": p.id,
+                "name": p.name,
+                "name_ar": p.name_ar,
+                "units": qty,
+                "lost_retail": rev,
+                "lost_cost": cst,
+            }
+        )
+    return {
+        "items_count": items_count,
+        "products_count": len(products),
+        "lost_retail": lost_retail,
+        "lost_cost": lost_cost,
+        "products": products,
+    }
 
 
 def report_for_range(db: Session, *, date_from: date, date_to: date) -> dict:

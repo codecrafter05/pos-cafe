@@ -12,7 +12,7 @@ from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.user import User
 from app.schemas.dashboard import OrderStatusUpdate
-from app.schemas.orders import OrderCreate, OrderItemOut, OrderOut
+from app.schemas.orders import OrderCreate, OrderItemLineStatusUpdate, OrderItemOut, OrderOut
 from app.services import inventory_service, order_service, whatsapp_service
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,7 @@ def update_order_status(
     if body.status == "cancelled" and old_status != "cancelled":
         try:
             inventory_service.reverse_sale_deductions_for_order(db, order_id=order.id)
+            order_service.recompute_order_totals(db, order)
         except Exception:
             db.rollback()
             raise
@@ -112,6 +113,39 @@ def update_order_status(
             whatsapp_service.notify_order_ready(order.customer_phone, order.id)
         except Exception:
             logger.exception("WhatsApp ready notification failed")
+    db.refresh(order)
+    return _order_to_out(db, order)
+
+
+@router.put("/{order_id}/items/{item_id}/status", response_model=OrderOut)
+def update_order_item_status(
+    order_id: int,
+    item_id: int,
+    body: OrderItemLineStatusUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(_staff),
+):
+    order = (
+        db.query(Order)
+        .options(joinedload(Order.items).joinedload(OrderItem.product))
+        .filter(Order.id == order_id)
+        .first()
+    )
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if user.role == "cashier" and order.user_id != user.id and order.source != "online":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    item = next((it for it in order.items if it.id == item_id), None)
+    if item is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order item not found")
+    try:
+        order_service.set_order_item_line_status(
+            db, order=order, item=item, new_status=body.status
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(order)
     return _order_to_out(db, order)
 

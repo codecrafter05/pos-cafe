@@ -158,15 +158,19 @@
       var cafeName = (shop && shop.cafe_name) ? String(shop.cafe_name) : 'My Cafe';
       document.title = 'Receipt #' + o.id;
       var rows = (o.items || []).map(function (it) {
+        var st = it.line_status || 'sold';
+        if (st === 'cancelled') return '';
         var line = Number(it.unit_price) * Number(it.quantity);
         var extra = modsLine(it.modifiers_snapshot);
+        var name = esc(it.product_name || ('#' + it.product_id));
+        if (st === 'wasted') name += ' <span class="receipt-meta">(waste)</span>';
         return '<tr>' +
-          '<td>' + esc(it.product_name || ('#' + it.product_id)) +
+          '<td>' + name +
             (extra ? '<div class="receipt-meta">' + extra + '</div>' : '') +
             (it.notes ? '<div class="receipt-meta">' + esc(it.notes) + '</div>' : '') +
           '</td>' +
           '<td class="text-center">' + it.quantity + '</td>' +
-          '<td class="text-end">' + PodCafe.currency(line) + '</td>' +
+          '<td class="text-end">' + (st === 'wasted' ? '—' : PodCafe.currency(line)) + '</td>' +
         '</tr>';
       }).join('');
       var logoHtml = (shop && shop.logo_url)
