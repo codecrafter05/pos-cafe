@@ -59,6 +59,35 @@
     return g;
   }
 
+  function extraPriceLabel(n) {
+    var x = Number(n) || 0;
+    if (x === 0) return '';
+    var s = x.toLocaleString('en-BH', {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3,
+    });
+    return '(+' + s + ')';
+  }
+
+  function modifiersInfoHtml(p) {
+    var groups = groupModifiers(p.modifiers);
+    var names = Object.keys(groups);
+    if (!names.length) return '';
+    var lines = names.map(function (gn) {
+      var parts = groups[gn].map(function (o) {
+        var extra = extraPriceLabel(o.extra_price);
+        return esc(o.option_name) + (extra ? ' ' + extra : '');
+      }).join(', ');
+      return (
+        '<div class="store-card__mod">' +
+        '<span class="store-card__mod-group">' + esc(gn) + ':</span> ' +
+        parts +
+        '</div>'
+      );
+    });
+    return '<div class="store-card__mods">' + lines.join('') + '</div>';
+  }
+
   function openAddModal(p) {
     pendingProduct = p;
     document.getElementById('addTitle').textContent = dispName(p);
@@ -182,7 +211,9 @@
           '<button type="button" class="store-add-btn js-add store-ordering-only" data-pid="' +
           p.id +
           '">Add</button>' +
-          '</div></div>';
+          '</div>' +
+          modifiersInfoHtml(p) +
+          '</div>';
         grid.appendChild(col);
       });
       section.appendChild(grid);

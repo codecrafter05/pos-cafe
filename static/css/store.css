@@ -396,6 +396,27 @@ body.store-page.store-ordering-on .store-header__inner {
   letter-spacing: 0.01em;
 }
 
+.store-card__mods {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  margin: 0.15rem 0 0;
+}
+
+.store-card__mod {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--store-ink-mute);
+}
+
+.store-card__mod-group {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--store-ink-soft);
+}
+
 .store-add-btn {
   border: 0;
   border-radius: 999px;
