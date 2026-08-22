@@ -4,6 +4,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.inventory_movement import InventoryMovement
+from app.models.modifier_recipe import ModifierRecipe
+from app.models.product_modifier import ProductModifier
 from app.models.product_recipe import ProductRecipe
 from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
@@ -68,18 +70,12 @@ def adjust_raw_material_stock(
     return rm
 
 
-def assert_sufficient_stock_for_product(
+def _assert_recipe_lines_stock(
     db: Session,
-    *,
-    product_id: int,
+    lines,
     quantity: int,
     reserved: dict[int, Decimal],
 ) -> Decimal:
-    """Confirm recipe materials exist and stock covers this line plus earlier
-    lines in the same order. Does not deduct. ``reserved`` is mutated with
-    additional raw-material quantities this line would consume.
-    """
-    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
     unit_cost = Decimal("0")
     for line in lines:
         rm = (
@@ -109,16 +105,14 @@ def assert_sufficient_stock_for_product(
     return unit_cost
 
 
-def apply_sale_deduction_for_product(
+def _deduct_recipe_lines(
     db: Session,
-    *,
-    product_id: int,
+    lines,
     quantity: int,
     order_id: int,
-    order_item_id: int | None = None,
+    order_item_id: int | None,
+    notes: str,
 ) -> Decimal:
-    """Deduct recipe materials for ``quantity`` units of ``product_id``. Returns unit cost (one unit)."""
-    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
     unit_cost = Decimal("0")
     for line in lines:
         rm = (
@@ -150,9 +144,82 @@ def apply_sale_deduction_for_product(
             quantity=-qty_needed,
             order_id=order_id,
             order_item_id=order_item_id,
-            notes=f"Sale: product {product_id} × {quantity}",
+            notes=notes,
         )
     return unit_cost
+
+
+def assert_sufficient_stock_for_product(
+    db: Session,
+    *,
+    product_id: int,
+    quantity: int,
+    reserved: dict[int, Decimal],
+) -> Decimal:
+    """Confirm recipe materials exist and stock covers this line plus earlier
+    lines in the same order. Does not deduct. ``reserved`` is mutated with
+    additional raw-material quantities this line would consume.
+    """
+    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
+    return _assert_recipe_lines_stock(db, lines, quantity, reserved)
+
+
+def assert_sufficient_stock_for_modifiers(
+    db: Session,
+    *,
+    modifiers: list[ProductModifier],
+    quantity: int,
+    reserved: dict[int, Decimal],
+) -> Decimal:
+    """Same reservation rules as the base recipe, for optional modifier ingredients."""
+    if not modifiers:
+        return Decimal("0")
+    ids = [m.id for m in modifiers]
+    lines = db.query(ModifierRecipe).filter(ModifierRecipe.modifier_id.in_(ids)).all()
+    return _assert_recipe_lines_stock(db, lines, quantity, reserved)
+
+
+def apply_sale_deduction_for_product(
+    db: Session,
+    *,
+    product_id: int,
+    quantity: int,
+    order_id: int,
+    order_item_id: int | None = None,
+) -> Decimal:
+    """Deduct recipe materials for ``quantity`` units of ``product_id``. Returns unit cost (one unit)."""
+    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
+    return _deduct_recipe_lines(
+        db,
+        lines,
+        quantity,
+        order_id,
+        order_item_id,
+        notes=f"Sale: product {product_id} × {quantity}",
+    )
+
+
+def apply_sale_deduction_for_modifiers(
+    db: Session,
+    *,
+    modifiers: list[ProductModifier],
+    quantity: int,
+    order_id: int,
+    order_item_id: int | None = None,
+) -> Decimal:
+    """Deduct optional modifier ingredients. No-op when none are linked. Returns extra unit cost."""
+    extra_cost = Decimal("0")
+    for mod in modifiers:
+        lines = db.query(ModifierRecipe).filter(ModifierRecipe.modifier_id == mod.id).all()
+        extra_cost += _deduct_recipe_lines(
+            db,
+            lines,
+            quantity,
+            order_id,
+            order_item_id,
+            notes=f"Sale: modifier {mod.id} ({mod.group_name}/{mod.option_name}) × {quantity}",
+        )
+    return extra_cost
 
 
 def reverse_sale_deductions_for_item(db: Session, *, item) -> None:

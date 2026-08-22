@@ -9,6 +9,7 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.inventory_movement import InventoryMovement
+    from app.models.modifier_recipe import ModifierRecipe
     from app.models.product_recipe import ProductRecipe
     from app.models.purchase import Purchase
 
@@ -27,6 +28,9 @@ class RawMaterial(Base):
     )
 
     recipe_lines: Mapped[list["ProductRecipe"]] = relationship("ProductRecipe", back_populates="raw_material")
+    modifier_recipe_lines: Mapped[list["ModifierRecipe"]] = relationship(
+        "ModifierRecipe", back_populates="raw_material"
+    )
     movements: Mapped[list["InventoryMovement"]] = relationship(
         "InventoryMovement", back_populates="raw_material"
     )

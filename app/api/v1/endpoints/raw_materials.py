@@ -97,10 +97,10 @@ def delete_raw_material(
     rm = db.get(RawMaterial, material_id)
     if rm is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Raw material not found")
-    if rm.recipe_lines:
+    if rm.recipe_lines or rm.modifier_recipe_lines:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete material used in a product recipe. Remove it from all recipes first.",
+            detail="Cannot delete material used in a product or modifier recipe. Remove it from all recipes first.",
         )
     try:
         db.query(InventoryMovement).filter(InventoryMovement.raw_material_id == material_id).delete(
