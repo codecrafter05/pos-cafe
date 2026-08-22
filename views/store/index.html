@@ -80,6 +80,10 @@
         '<label class="form-label">' + esc(gn) + '</label>' +
         '<select class="form-select rounded-3 mod-select" data-group="' + esc(gn) + '" id="' + sid + '">';
       var sel = wrap.querySelector('select');
+      var none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'None';
+      sel.appendChild(none);
       opts.forEach(function (o) {
         var ex = Number(o.extra_price) || 0;
         var op = document.createElement('option');
@@ -99,6 +103,7 @@
   function collectModifiersFromModal() {
     var mods = [];
     document.querySelectorAll('#addBody select.mod-select').forEach(function (sel) {
+      if (!sel.value) return;
       try {
         mods.push(JSON.parse(sel.value));
       } catch (e) {}

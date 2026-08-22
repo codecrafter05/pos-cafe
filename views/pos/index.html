@@ -377,6 +377,10 @@
       var select = document.createElement('select');
       select.className = 'form-select rounded-3 pos-mod-select';
       select.dataset.group = gName;
+      var none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'None';
+      select.appendChild(none);
       groups[gName].forEach(function (m) {
         var opt = document.createElement('option');
         opt.value = JSON.stringify({ group_name: m.group_name, option_name: m.option_name, extra_price: Number(m.extra_price) });
@@ -419,6 +423,7 @@
     if (!pendingProduct) return;
     var selected = [];
     document.querySelectorAll('.pos-mod-select').forEach(function (sel) {
+      if (!sel.value) return;
       try { selected.push(JSON.parse(sel.value)); } catch (err) {}
     });
     addToCart(pendingProduct, selected, 1);
