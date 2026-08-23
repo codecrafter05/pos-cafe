@@ -32,6 +32,7 @@
 (function () {
   var params = new URLSearchParams(window.location.search);
   var id = params.get('order_id');
+  var n = params.get('n');
   var elId = document.getElementById('ordId');
   var elSt = document.getElementById('ordStatus');
   var elTot = document.getElementById('ordTotal');
@@ -39,7 +40,7 @@
     elId.textContent = '?';
     return;
   }
-  elId.textContent = '#' + id;
+  elId.textContent = n ? ('#' + n) : '—';
 
   function poll() {
     fetch('/api/store/orders/' + encodeURIComponent(id) + '/status')
@@ -48,6 +49,7 @@
         return r.json();
       })
       .then(function (o) {
+        if (o.daily_order_number != null) elId.textContent = '#' + o.daily_order_number;
         elSt.textContent = o.status;
         elTot.textContent = PodCafeStore.currencyBhd(o.total_amount);
         if (o.status === 'ready') elSt.className = 'badge bg-success rounded-pill';

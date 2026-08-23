@@ -265,7 +265,11 @@
         return;
       }
       PodCafeStore.setCart([]);
-      window.location.replace('/store/confirmation?order_id=' + encodeURIComponent(data.id));
+      var confirmUrl = '/store/confirmation?order_id=' + encodeURIComponent(data.id);
+      if (data.daily_order_number != null) {
+        confirmUrl += '&n=' + encodeURIComponent(data.daily_order_number);
+      }
+      window.location.replace(confirmUrl);
     } catch (e) {
       err.textContent = 'Network error';
       err.classList.remove('d-none');

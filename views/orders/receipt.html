@@ -156,7 +156,8 @@
       }
       var o = await res.json();
       var cafeName = (shop && shop.cafe_name) ? String(shop.cafe_name) : 'My Cafe';
-      document.title = 'Receipt #' + o.id;
+      var dailyNum = (o.daily_order_number != null) ? o.daily_order_number : '—';
+      document.title = 'Receipt #' + dailyNum;
       var rows = (o.items || []).map(function (it) {
         var st = it.line_status || 'sold';
         if (st === 'cancelled') return '';
@@ -188,7 +189,7 @@
           '<div class="receipt-shop">' + esc(cafeName) + '</div>' +
         '</div>' +
         '<div class="receipt-meta mb-3">' +
-          '<div><strong>Order #' + o.id + '</strong></div>' +
+          '<div><strong>Order #' + dailyNum + '</strong></div>' +
           '<div>' + fmtBh(o.created_at) + '</div>' +
           '<div>Payment: ' + esc(payLabel(o.payment_method)) + '</div>' +
           (o.customer_name ? '<div>Customer: ' + esc(o.customer_name) + '</div>' : '') +

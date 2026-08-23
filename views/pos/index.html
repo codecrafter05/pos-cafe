@@ -481,9 +481,9 @@
       }
       var rolePay = PodCafe.payloadFromToken(PodCafe.getToken());
       if (rolePay && rolePay.role === 'cashier') {
-        ok.textContent = 'Order #' + data.id + ' completed — total ' + money(data.total_amount);
+        ok.textContent = 'Order #' + (data.daily_order_number != null ? data.daily_order_number : '—') + ' completed — total ' + money(data.total_amount);
       } else {
-        ok.textContent = 'Order #' + data.id + ' completed — total ' + money(data.total_amount) +
+        ok.textContent = 'Order #' + (data.daily_order_number != null ? data.daily_order_number : '—') + ' completed — total ' + money(data.total_amount) +
           ', profit ' + money(data.profit);
       }
       ok.classList.remove('d-none');

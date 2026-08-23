@@ -21,6 +21,7 @@ from app.schemas.store import (
     StoreProductOut,
 )
 from app.services import order_service, whatsapp_service
+from app.services.order_numbering import daily_order_number_for
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +101,14 @@ def create_store_order(body: StoreOrderCreate, db: Session = Depends(get_db)):
             detail="Could not place order",
         )
     db.refresh(order)
+    daily_number = daily_order_number_for(db, order.id)
     try:
-        whatsapp_service.notify_order_received(phone, order.id)
+        whatsapp_service.notify_order_received(phone, daily_number)
     except Exception:
         logger.exception("WhatsApp order confirmation failed (order still created)")
     return StoreOrderCreatedOut(
         id=order.id,
+        daily_order_number=daily_number,
         status=order.status,
         total_amount=order.total_amount,
         created_at=order.created_at,
@@ -117,4 +120,11 @@ def get_public_order_status(order_id: int, db: Session = Depends(get_db)):
     order = db.get(Order, order_id)
     if order is None or order.source != "online":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return PublicOrderStatusOut.model_validate(order)
+    return PublicOrderStatusOut(
+        id=order.id,
+        daily_order_number=daily_order_number_for(db, order.id),
+        status=order.status,
+        total_amount=order.total_amount,
+        created_at=order.created_at,
+        source=order.source,
+    )

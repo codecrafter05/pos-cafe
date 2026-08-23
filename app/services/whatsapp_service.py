@@ -140,32 +140,32 @@ def send_text(phone_digits: str, text: str) -> bool:
         return False
 
 
-def notify_order_received(phone: str, order_id: int) -> bool:
+def notify_order_received(phone: str, daily_order_number: int) -> bool:
     normalized = normalize_whatsapp_number(phone)
     ok = send_text(
         phone,
-        f"Your order was received ✓\nOrder no.: #{order_id}\nWe'll notify you when it's ready ☕",
+        f"Your order was received ✓\nOrder no.: #{daily_order_number}\nWe'll notify you when it's ready ☕",
     )
     if not ok:
         logger.warning(
             "Order #%s: WhatsApp confirmation not sent (check .env Evolution + phone %r → %r)",
-            order_id,
+            daily_order_number,
             phone,
             normalized,
         )
     return ok
 
 
-def notify_order_ready(phone: str, order_id: int) -> bool:
+def notify_order_ready(phone: str, daily_order_number: int) -> bool:
     normalized = normalize_whatsapp_number(phone)
     ok = send_text(
         phone,
-        f"Your order is ready ☕\nOrder no.: #{order_id}\nThank you — see you soon!",
+        f"Your order is ready ☕\nOrder no.: #{daily_order_number}\nThank you — see you soon!",
     )
     if not ok:
         logger.warning(
             "Order #%s: WhatsApp ready message not sent (check Evolution + phone %r → %r)",
-            order_id,
+            daily_order_number,
             phone,
             normalized,
         )
