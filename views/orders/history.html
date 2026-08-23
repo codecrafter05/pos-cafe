@@ -140,6 +140,11 @@
     setQuickPressed(document.getElementById('fltYesterday'), isYest);
   }
 
+  var isOwner = (function () {
+    var p = PodCafe.payloadFromToken(PodCafe.getToken());
+    return !!(p && p.role === 'owner');
+  })();
+
   function dailyNum(o) {
     return (o && o.daily_order_number != null) ? o.daily_order_number : '—';
   }
@@ -304,7 +309,12 @@
         '">' + esc(r.status) + '</span></td>' +
         '<td class="text-end text-nowrap">' +
           '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 me-1 js-view" data-id="' + r.id + '" title="عرض التفاصيل">View</button>' +
-          '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 js-st" data-id="' + r.id + '" data-status="' + stVal + '">Status</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-primary rounded-3 js-st' +
+          (isOwner && String(r.status) === 'cancelled' ? ' me-1' : '') +
+          '" data-id="' + r.id + '" data-status="' + stVal + '">Status</button>' +
+          (isOwner && String(r.status) === 'cancelled'
+            ? '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 js-del" data-id="' + r.id + '" data-daily="' + esc(String(dailyNum(r))) + '">Delete</button>'
+            : '') +
         '</td>';
       tb.appendChild(tr);
     });
@@ -321,6 +331,27 @@
         openView(btn.getAttribute('data-id'));
       });
     });
+    tb.querySelectorAll('.js-del').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        deleteOrder(btn.getAttribute('data-id'), btn.getAttribute('data-daily'));
+      });
+    });
+  }
+
+  async function deleteOrder(id, daily) {
+    var label = daily && daily !== '—' ? daily : id;
+    if (!window.confirm('Are you sure you want to permanently delete order #' + label + '? This cannot be undone.')) {
+      return;
+    }
+    var res = await PodCafe.apiFetch('/api/v1/orders/' + encodeURIComponent(id), { method: 'DELETE' });
+    if (!res.ok) {
+      var d = await res.json().catch(function () { return {}; });
+      var detail = d.detail;
+      PodCafe.toast(typeof detail === 'string' ? detail : 'Could not delete order', 'danger');
+      return;
+    }
+    PodCafe.toast('Order deleted', 'success');
+    load();
   }
 
   document.getElementById('fltApply').addEventListener('click', function () {

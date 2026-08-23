@@ -2,8 +2,10 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.inventory_movement import InventoryMovement
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
@@ -325,3 +327,31 @@ def set_order_item_line_status(db: Session, *, order: Order, item: OrderItem, ne
     item.line_status = new_status
     db.flush()
     return recompute_order_totals(db, order)
+
+
+def delete_cancelled_order(db: Session, order: Order) -> None:
+    """Hard-delete a cancelled order and its child rows.
+
+    Non-cancelled orders are blocked so stock is restored via the existing
+    cancel path before the sale (and its movement history) disappears.
+    """
+    if (order.status or "") != "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cancel this order first so stock is restored, then you can delete it.",
+        )
+    order_id = order.id
+    item_ids = [
+        row[0]
+        for row in db.query(OrderItem.id).filter(OrderItem.order_id == order_id).all()
+    ]
+    movement_filter = InventoryMovement.order_id == order_id
+    if item_ids:
+        movement_filter = or_(
+            InventoryMovement.order_id == order_id,
+            InventoryMovement.order_item_id.in_(item_ids),
+        )
+    db.query(InventoryMovement).filter(movement_filter).delete(synchronize_session=False)
+    db.query(OrderItem).filter(OrderItem.order_id == order_id).delete(synchronize_session=False)
+    db.query(Order).filter(Order.id == order_id).delete(synchronize_session=False)
+    db.flush()

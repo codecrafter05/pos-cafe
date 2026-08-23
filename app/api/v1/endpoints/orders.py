@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_roles
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 _staff = require_roles("owner", "manager", "cashier")
+_owner = require_roles("owner")
 
 
 def _order_to_out(
@@ -185,3 +187,27 @@ def get_order(
     if user.role == "cashier" and order.user_id != user.id and order.source != "online":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     return _order_to_out(db, order)
+
+
+@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(_owner),
+):
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    try:
+        order_service.delete_cancelled_order(db, order)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete: this order is still referenced in the database.",
+        ) from None
+    except Exception:
+        db.rollback()
+        raise
+    return None
