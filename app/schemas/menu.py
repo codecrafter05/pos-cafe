@@ -41,11 +41,21 @@ class RecipeLineOut(RecipeLineIn):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ModifierRecipeLineIn(RecipeLineIn):
+    substitutes_raw_material_id: int | None = None
+
+
+class ModifierRecipeLineOut(ModifierRecipeLineIn):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ModifierIn(BaseModel):
     group_name: str = Field(..., max_length=100)
     option_name: str = Field(..., max_length=100)
     extra_price: Decimal = Decimal("0")
-    recipe: list[RecipeLineIn] = []
+    recipe: list[ModifierRecipeLineIn] = []
 
 
 class ModifierOut(BaseModel):
@@ -53,7 +63,7 @@ class ModifierOut(BaseModel):
     group_name: str
     option_name: str
     extra_price: Decimal = Decimal("0")
-    recipe: list[RecipeLineOut] = []
+    recipe: list[ModifierRecipeLineOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 

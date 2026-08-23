@@ -29,7 +29,9 @@ class RawMaterial(Base):
 
     recipe_lines: Mapped[list["ProductRecipe"]] = relationship("ProductRecipe", back_populates="raw_material")
     modifier_recipe_lines: Mapped[list["ModifierRecipe"]] = relationship(
-        "ModifierRecipe", back_populates="raw_material"
+        "ModifierRecipe",
+        back_populates="raw_material",
+        foreign_keys="ModifierRecipe.raw_material_id",
     )
     movements: Mapped[list["InventoryMovement"]] = relationship(
         "InventoryMovement", back_populates="raw_material"

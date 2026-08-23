@@ -72,7 +72,7 @@
           <h5 class="fw-bold mb-0">Modifiers</h5>
           <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="modAddRow">Add option</button>
         </div>
-        <p class="text-secondary small mb-3">Grouped options (e.g. Size → Large) with optional extra price. Link an ingredient only when that option should consume extra stock.</p>
+        <p class="text-secondary small mb-3">Grouped options (e.g. Size → Large) with optional extra price. Link an ingredient to add extra stock use, or to replace a base-recipe ingredient (e.g. Plant milk instead of cow milk).</p>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead><tr><th>Group</th><th>Option</th><th class="text-end">+ Price</th><th></th></tr></thead>
@@ -124,7 +124,29 @@
     }).join('');
   }
 
-  function addIngLine(container, mid, q, u) {
+  function baseRecipeOptions(selectedId) {
+    var seen = {};
+    var html = '<option value="">None (adds extra)</option>';
+    document.querySelectorAll('#recRows tr').forEach(function (tr) {
+      var sel = tr.querySelector('.rec-m');
+      if (!sel) return;
+      var id = Number(sel.value);
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      var name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : ('#' + id);
+      html += '<option value="' + id + '"' + (selectedId && Number(selectedId) === id ? ' selected' : '') + '>' + escAttr(name) + '</option>';
+    });
+    return html;
+  }
+
+  function refreshSubDropdowns() {
+    document.querySelectorAll('.mod-ing-sub').forEach(function (sel) {
+      var current = sel.value;
+      sel.innerHTML = baseRecipeOptions(current);
+    });
+  }
+
+  function addIngLine(container, mid, q, u, substitutesId) {
     var row = document.createElement('div');
     row.className = 'd-flex flex-wrap gap-2 align-items-center mb-2 mod-ing-line';
     var uid = mid || (mats[0] && mats[0].id);
@@ -139,6 +161,10 @@
       '</select>' +
       '<input type="number" step="0.001" min="0" class="form-control form-control-sm text-end rounded-3 mod-ing-q" style="width:6.5rem" placeholder="Qty" value="' + escAttr(q == null || q === '' ? '' : q) + '">' +
       '<input class="form-control form-control-sm rounded-3 mod-ing-u" style="width:5.5rem" placeholder="Unit" value="' + escAttr(unit) + '">' +
+      '<label class="small text-secondary mb-0 text-nowrap">Replaces base ingredient (optional)</label>' +
+      '<select class="form-select form-select-sm rounded-3 mod-ing-sub" style="min-width:12rem">' +
+        baseRecipeOptions(substitutesId) +
+      '</select>' +
       '<button type="button" class="btn btn-sm btn-outline-danger border-0 mod-ing-del" aria-label="Remove ingredient"><i class="material-icons-outlined" style="font-size:18px">close</i></button>';
     container.appendChild(row);
   }
@@ -169,7 +195,7 @@
     tr2.className = 'mod-ings' + (hasIng ? '' : ' d-none');
     tr2.innerHTML =
       '<td colspan="4" class="pt-0">' +
-        '<div class="small text-secondary mb-2">Optional extra ingredients consumed when this option is selected.</div>' +
+        '<div class="small text-secondary mb-2">Ingredient consumed when this option is selected. Leave “Replaces” as None to add extra stock use; pick a base-recipe ingredient to use this material instead of that one.</div>' +
         '<div class="mod-ing-lines"></div>' +
         '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 mod-ing-add">Add ingredient</button>' +
       '</td>';
@@ -177,7 +203,7 @@
     tbody.appendChild(tr2);
     var box = tr2.querySelector('.mod-ing-lines');
     lines.forEach(function (r) {
-      addIngLine(box, r.raw_material_id, r.quantity_used, r.unit);
+      addIngLine(box, r.raw_material_id, r.quantity_used, r.unit, r.substitutes_raw_material_id);
     });
   }
 
@@ -385,9 +411,6 @@
         document.getElementById('prodStoredImageUrl').value = incomingImg;
       }
       refreshImagePreview(false);
-      (pr.modifiers || []).forEach(function (m) {
-        addModRow(m.group_name, m.option_name, m.extra_price, m.recipe || []);
-      });
       var recB = document.getElementById('recRows');
       (pr.recipe || []).forEach(function (r) {
         var tr = document.createElement('tr');
@@ -400,6 +423,9 @@
           '<td><input class="form-control form-control-sm rounded-3 rec-u" value="' + String(r.unit).replace(/"/g, '&quot;') + '"></td>' +
           '<td>' + rowDelBtn('rec-del') + '</td>';
         recB.appendChild(tr);
+      });
+      (pr.modifiers || []).forEach(function (m) {
+        addModRow(m.group_name, m.option_name, m.extra_price, m.recipe || []);
       });
     }
     } catch (e) {
@@ -429,7 +455,10 @@
     }
 
     document.getElementById('modAddRow').addEventListener('click', function () { addModRow('Size', 'Large', 0.100); });
-    document.getElementById('recAddRow').addEventListener('click', function () { addRecRow(mats[0] && mats[0].id, 1, mats[0] && mats[0].unit); });
+    document.getElementById('recAddRow').addEventListener('click', function () {
+      addRecRow(mats[0] && mats[0].id, 1, mats[0] && mats[0].unit);
+      refreshSubDropdowns();
+    });
 
     document.getElementById('modRows').addEventListener('click', function (e) {
       var del = e.target.closest('.mod-del');
@@ -475,7 +504,13 @@
       if (found && unitInput && !unitInput.value.trim()) unitInput.value = found.unit;
     });
     document.getElementById('recRows').addEventListener('click', function (e) {
-      if (e.target.closest('.rec-del')) e.target.closest('tr').remove();
+      if (e.target.closest('.rec-del')) {
+        e.target.closest('tr').remove();
+        refreshSubDropdowns();
+      }
+    });
+    document.getElementById('recRows').addEventListener('change', function (e) {
+      if (e.target.classList.contains('rec-m')) refreshSubDropdowns();
     });
 
     /** If user chose a file but did not click "Upload photo", upload it before save. */
@@ -577,7 +612,14 @@
             var q = row.querySelector('.mod-ing-q').value;
             var u = row.querySelector('.mod-ing-u').value.trim();
             if (!mid || !u || !q || Number(q) <= 0) return;
-            recipe.push({ raw_material_id: mid, quantity_used: String(q), unit: u });
+            var subEl = row.querySelector('.mod-ing-sub');
+            var subId = subEl && subEl.value ? Number(subEl.value) : null;
+            recipe.push({
+              raw_material_id: mid,
+              quantity_used: String(q),
+              unit: u,
+              substitutes_raw_material_id: subId || null
+            });
           });
         }
         out.push({ group_name: g, option_name: o, extra_price: String(p), recipe: recipe });

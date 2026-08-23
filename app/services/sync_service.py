@@ -22,6 +22,7 @@ from app.schemas.sync import (
     SyncShopOut,
 )
 from app.services import order_service
+from app.services.order_numbering import daily_order_number_for
 from app.services.shop_settings_service import display_cafe_name, get_settings
 
 
@@ -104,11 +105,14 @@ def _existing_by_client_uuid(db: Session, client_uuid: str) -> Order | None:
     return db.query(Order).filter(Order.client_uuid == client_uuid).first()
 
 
-def _success_result(client_uuid: UUID, server_order_id: int) -> SyncOrderResult:
+def _success_result(
+    db: Session, client_uuid: UUID, server_order_id: int
+) -> SyncOrderResult:
     return SyncOrderResult(
         client_uuid=client_uuid,
         status="success",
         server_order_id=server_order_id,
+        daily_order_number=daily_order_number_for(db, server_order_id),
     )
 
 
@@ -146,7 +150,7 @@ def _sync_one_device_order(
     uuid_str = str(payload.client_uuid)
     existing = _existing_by_client_uuid(db, uuid_str)
     if existing is not None:
-        return _success_result(payload.client_uuid, existing.id)
+        return _success_result(db, payload.client_uuid, existing.id)
 
     device_id = payload.device_id or batch_device_id
     created_at = to_naive_utc(payload.created_at) if payload.created_at is not None else None
@@ -168,7 +172,7 @@ def _sync_one_device_order(
             created_at=created_at,
         )
         db.commit()
-        return _success_result(payload.client_uuid, order.id)
+        return _success_result(db, payload.client_uuid, order.id)
     except HTTPException as exc:
         db.rollback()
         return _failed_result(payload.client_uuid, _http_detail_reason(exc))
@@ -176,7 +180,7 @@ def _sync_one_device_order(
         db.rollback()
         raced = _existing_by_client_uuid(db, uuid_str)
         if raced is not None:
-            return _success_result(payload.client_uuid, raced.id)
+            return _success_result(db, payload.client_uuid, raced.id)
         return _failed_result(payload.client_uuid, "Could not save order (duplicate or constraint error)")
     except Exception as exc:
         db.rollback()

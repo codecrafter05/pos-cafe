@@ -77,6 +77,7 @@ class SyncOrderResult(BaseModel):
     client_uuid: UUID
     status: Literal["success", "failed"]
     server_order_id: int | None = None
+    daily_order_number: int | None = None
     reason: str | None = None
 
 

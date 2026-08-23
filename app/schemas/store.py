@@ -56,6 +56,7 @@ class StoreOrderCreate(BaseModel):
 
 class StoreOrderCreatedOut(BaseModel):
     id: int
+    daily_order_number: int
     status: str
     total_amount: Decimal
     created_at: datetime
@@ -63,6 +64,7 @@ class StoreOrderCreatedOut(BaseModel):
 
 class PublicOrderStatusOut(BaseModel):
     id: int
+    daily_order_number: int
     status: str
     total_amount: Decimal
     created_at: datetime

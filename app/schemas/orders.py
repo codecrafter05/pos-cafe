@@ -49,6 +49,9 @@ class OrderItemLineStatusUpdate(BaseModel):
 
 class OrderOut(BaseModel):
     id: int
+    # Human-facing # for this Bahrain calendar day. Not the primary key.
+    # Computed at query time; always overwrite before returning this model.
+    daily_order_number: int | None = None
     user_id: int
     staff_username: str | None = None
     customer_name: str | None

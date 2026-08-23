@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.dashboard import OrderStatusUpdate
 from app.schemas.orders import OrderCreate, OrderItemLineStatusUpdate, OrderItemOut, OrderOut
 from app.services import inventory_service, order_service, whatsapp_service
+from app.services.order_numbering import daily_order_number_for, daily_order_numbers_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +23,30 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 _staff = require_roles("owner", "manager", "cashier")
 
 
-def _order_to_out(db: Session, order: Order) -> OrderOut:
+def _order_to_out(
+    db: Session, order: Order, daily_order_number: int | None = None
+) -> OrderOut:
     staff = db.get(User, order.user_id)
     items_out: list[OrderItemOut] = []
     for it in order.items:
         pname = it.product.name if getattr(it, "product", None) else None
         io = OrderItemOut.model_validate(it)
         items_out.append(io.model_copy(update={"product_name": pname}))
+    if daily_order_number is None:
+        daily_order_number = daily_order_number_for(db, order.id)
     base = OrderOut.model_validate(order)
     return base.model_copy(
         update={
             "items": items_out,
             "staff_username": staff.username if staff else None,
+            "daily_order_number": daily_order_number,
         }
     )
+
+
+def _orders_to_out(db: Session, orders: list[Order]) -> list[OrderOut]:
+    numbers = daily_order_numbers_by_id(db, [o.id for o in orders])
+    return [_order_to_out(db, o, numbers.get(o.id)) for o in orders]
 
 
 @router.get("", response_model=list[OrderOut])
@@ -56,7 +67,8 @@ def list_orders(
         q = q.filter(Order.created_at >= start, Order.created_at < end)
     if status_filter:
         q = q.filter(Order.status == status_filter)
-    return q.order_by(Order.created_at.desc()).limit(500).all()
+    orders = q.order_by(Order.created_at.desc()).limit(500).all()
+    return _orders_to_out(db, orders)
 
 
 @router.post("", response_model=OrderOut)
@@ -71,9 +83,13 @@ def create_order(
     except Exception:
         db.rollback()
         raise
-    return (
-        db.query(Order).options(joinedload(Order.items)).filter(Order.id == order.id).one()
+    fresh = (
+        db.query(Order)
+        .options(joinedload(Order.items).joinedload(OrderItem.product))
+        .filter(Order.id == order.id)
+        .one()
     )
+    return _order_to_out(db, fresh)
 
 
 @router.put("/{order_id}/status", response_model=OrderOut)
@@ -110,7 +126,9 @@ def update_order_status(
         and order.customer_phone
     ):
         try:
-            whatsapp_service.notify_order_ready(order.customer_phone, order.id)
+            whatsapp_service.notify_order_ready(
+                order.customer_phone, daily_order_number_for(db, order.id)
+            )
         except Exception:
             logger.exception("WhatsApp ready notification failed")
     db.refresh(order)

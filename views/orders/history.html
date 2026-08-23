@@ -39,7 +39,7 @@
       <table class="table align-middle mb-0">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>Order #</th>
             <th>When</th>
             <th class="text-end">Total</th>
             <th>Source</th>
@@ -140,6 +140,10 @@
     setQuickPressed(document.getElementById('fltYesterday'), isYest);
   }
 
+  function dailyNum(o) {
+    return (o && o.daily_order_number != null) ? o.daily_order_number : '—';
+  }
+
   function fmtWhen(iso) {
     try {
       var d = new Date(iso);
@@ -168,7 +172,7 @@
 
   function renderView(o) {
     viewOrderId = o.id;
-    document.getElementById('viewModalTitle').textContent = 'Order #' + o.id;
+    document.getElementById('viewModalTitle').textContent = 'Order #' + dailyNum(o);
     var meta = document.getElementById('viewMeta');
     meta.innerHTML =
       '<div class="col-md-6"><span class="text-secondary">Created</span><div class="fw-semibold">' + fmtWhen(o.created_at) + '</div></div>' +
@@ -287,7 +291,7 @@
       var tr = document.createElement('tr');
       var stVal = String(r.status || 'delivered').replace(/"/g, '&quot;');
       tr.innerHTML =
-        '<td class="fw-semibold">#' + r.id + '</td>' +
+        '<td class="fw-semibold">#' + dailyNum(r) + '</td>' +
         '<td class="text-secondary small">' + fmtWhen(r.created_at) + '</td>' +
         '<td class="text-end fw-semibold">' + PodCafe.currency(r.total_amount) + '</td>' +
         '<td><span class="badge rounded-2 ' +

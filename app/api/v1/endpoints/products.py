@@ -16,6 +16,7 @@ from app.models.product_recipe import ProductRecipe
 from app.models.user import User
 from app.schemas.menu import (
     ModifierOut,
+    ModifierRecipeLineOut,
     ProductCreate,
     ProductOut,
     ProductUpdate,
@@ -60,7 +61,7 @@ def _modifier_out(m: ProductModifier) -> ModifierOut:
         group_name=m.group_name,
         option_name=m.option_name,
         extra_price=m.extra_price,
-        recipe=[RecipeLineOut.model_validate(r) for r in m.recipe_lines],
+        recipe=[ModifierRecipeLineOut.model_validate(r) for r in m.recipe_lines],
     )
 
 
@@ -105,12 +106,14 @@ def _persist_modifiers(db: Session, product_id: int, mods) -> None:
             raw_id = ld.get("raw_material_id")
             if not raw_id or qty <= 0 or not unit:
                 continue
+            sub_id = ld.get("substitutes_raw_material_id")
             db.add(
                 ModifierRecipe(
                     modifier_id=mod.id,
                     raw_material_id=int(raw_id),
                     quantity_used=qty,
                     unit=unit,
+                    substitutes_raw_material_id=int(sub_id) if sub_id else None,
                 )
             )
 

@@ -149,18 +149,51 @@ def _deduct_recipe_lines(
     return unit_cost
 
 
+def substituted_raw_material_ids(
+    db: Session, modifiers: list[ProductModifier]
+) -> set[int]:
+    """Base-recipe raw materials replaced by the selected modifier options.
+
+    If two options both substitute the same base ingredient, that id appears
+    once — the base line is skipped once, and both substitute lines still
+    deduct their own materials.
+    """
+    if not modifiers:
+        return set()
+    ids = [m.id for m in modifiers]
+    rows = (
+        db.query(ModifierRecipe.substitutes_raw_material_id)
+        .filter(
+            ModifierRecipe.modifier_id.in_(ids),
+            ModifierRecipe.substitutes_raw_material_id.is_not(None),
+        )
+        .all()
+    )
+    return {int(rid) for (rid,) in rows if rid is not None}
+
+
+def _product_recipe_lines(
+    db: Session, product_id: int, skip_raw_material_ids: set[int] | None
+) -> list[ProductRecipe]:
+    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
+    if not skip_raw_material_ids:
+        return lines
+    return [line for line in lines if line.raw_material_id not in skip_raw_material_ids]
+
+
 def assert_sufficient_stock_for_product(
     db: Session,
     *,
     product_id: int,
     quantity: int,
     reserved: dict[int, Decimal],
+    skip_raw_material_ids: set[int] | None = None,
 ) -> Decimal:
     """Confirm recipe materials exist and stock covers this line plus earlier
     lines in the same order. Does not deduct. ``reserved`` is mutated with
     additional raw-material quantities this line would consume.
     """
-    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
+    lines = _product_recipe_lines(db, product_id, skip_raw_material_ids)
     return _assert_recipe_lines_stock(db, lines, quantity, reserved)
 
 
@@ -186,9 +219,10 @@ def apply_sale_deduction_for_product(
     quantity: int,
     order_id: int,
     order_item_id: int | None = None,
+    skip_raw_material_ids: set[int] | None = None,
 ) -> Decimal:
     """Deduct recipe materials for ``quantity`` units of ``product_id``. Returns unit cost (one unit)."""
-    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
+    lines = _product_recipe_lines(db, product_id, skip_raw_material_ids)
     return _deduct_recipe_lines(
         db,
         lines,
