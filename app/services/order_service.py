@@ -77,7 +77,6 @@ def _create_order_from_items(
     created_at: datetime | None = None,
 ) -> Order:
     prepared: list[tuple[OrderItemIn, Product, Decimal, list[ProductModifier]]] = []
-    reserved: dict[int, Decimal] = {}
 
     for line in items:
         product = (
@@ -107,20 +106,6 @@ def _create_order_from_items(
             )
 
         resolved_mods, extras = _resolve_selected_modifiers(db, product.id, line.modifiers)
-        skip_ids = inventory_service.substituted_raw_material_ids(db, resolved_mods)
-        inventory_service.assert_sufficient_stock_for_product(
-            db,
-            product_id=product.id,
-            quantity=line.quantity,
-            reserved=reserved,
-            skip_raw_material_ids=skip_ids,
-        )
-        inventory_service.assert_sufficient_stock_for_modifiers(
-            db,
-            modifiers=resolved_mods,
-            quantity=line.quantity,
-            reserved=reserved,
-        )
         prepared.append((line, product, extras, resolved_mods))
 
     order = Order(

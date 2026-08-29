@@ -213,6 +213,20 @@ def inventory_alerts(db: Session) -> list[RawMaterial]:
     )
 
 
+def negative_stock_materials(db: Session) -> list[RawMaterial]:
+    """Materials sold past their recorded stock, worst shortfall first.
+
+    Sales never block on stock, so a negative balance is the owner's signal that
+    either a purchase went unrecorded or the recipe/waste needs attention.
+    """
+    return (
+        db.query(RawMaterial)
+        .filter(RawMaterial.current_stock < 0)
+        .order_by(RawMaterial.current_stock.asc(), RawMaterial.name)
+        .all()
+    )
+
+
 def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]:
     """Revenue split by how the customer paid, biggest earner first."""
     rows = (

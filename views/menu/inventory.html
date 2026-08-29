@@ -1,6 +1,20 @@
 {% extends "base.html" %}
 {% block title %}{{ shop.cafe_name }} — Raw materials{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Negative stock is a harder signal than the existing "Low" warning: the
+     ingredient was sold past zero, so the books are wrong right now. */
+  .rm-row--negative {
+    background: rgba(220, 53, 69, 0.06);
+  }
+  .rm-stock--negative {
+    color: #b02a37;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex align-items-center mb-3">
   <h5 class="mb-0">Raw materials</h5>
@@ -8,6 +22,8 @@
     <button class="btn btn-grd-primary rounded-3 px-4" type="button" id="rmNewBtn">Add material</button>
   </div>
 </div>
+
+<div class="alert alert-danger rounded-4 d-none" id="rmNegBanner" role="alert"></div>
 
 <div class="card rounded-4">
   <div class="card-body">
@@ -133,18 +149,46 @@
     return null;
   }
 
+  // Dashboard links here as ?stock=negative — surface those rows first.
+  var negativeFirst = new URLSearchParams(window.location.search).get('stock') === 'negative';
+
+  function renderNegBanner(count) {
+    var banner = document.getElementById('rmNegBanner');
+    if (!count) {
+      banner.classList.add('d-none');
+      banner.textContent = '';
+      return;
+    }
+    banner.textContent = count === 1
+      ? '1 ingredient is in negative stock — it was sold past zero. Record the missing purchase or adjust the balance.'
+      : count + ' ingredients are in negative stock — they were sold past zero. Record the missing purchases or adjust the balances.';
+    banner.classList.remove('d-none');
+  }
+
   async function load() {
     var res = await PodCafe.apiFetch('/api/v1/raw-materials');
     var rows = await res.json();
+    var negCount = rows.filter(function (r) { return Number(r.current_stock) < 0; }).length;
+    renderNegBanner(negCount);
+    if (negativeFirst) {
+      rows = rows.slice().sort(function (a, b) {
+        return Number(a.current_stock) - Number(b.current_stock);
+      });
+    }
     var tb = document.getElementById('rmBody');
     tb.innerHTML = '';
     rows.forEach(function (r) {
-      var low = Number(r.current_stock) <= Number(r.min_stock_alert);
+      var stock = Number(r.current_stock);
+      var negative = stock < 0;
+      var low = !negative && stock <= Number(r.min_stock_alert);
       var tr = document.createElement('tr');
+      if (negative) tr.className = 'rm-row--negative';
       tr.innerHTML =
-        '<td class="fw-semibold">' + esc(r.name) + (low ? ' <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill">Low</span>' : '') + '</td>' +
+        '<td class="fw-semibold">' + esc(r.name) +
+          (negative ? ' <span class="badge bg-danger text-white rounded-pill">Negative</span>' : '') +
+          (low ? ' <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill">Low</span>' : '') + '</td>' +
         '<td class="text-secondary">' + esc(r.unit) + '</td>' +
-        '<td class="text-end fw-semibold">' + Number(r.current_stock).toFixed(3) + '</td>' +
+        '<td class="text-end ' + (negative ? 'rm-stock--negative' : 'fw-semibold') + '">' + stock.toFixed(3) + '</td>' +
         '<td class="text-end text-secondary">' + Number(r.min_stock_alert).toFixed(3) + '</td>' +
         '<td class="text-end">' + PodCafe.currency(r.cost_per_unit) + '</td>' +
         '<td class="text-end">' +

@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Handheld POS: short-lived access JWT, long-lived rotating refresh token.
     DEVICE_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 90
+    # Window in which replaying a just-rotated refresh token is read as "the
+    # rotation response never reached the device" instead of token theft. Devices
+    # sync over mobile data, where a dropped response is routine.
+    REFRESH_REUSE_GRACE_SECONDS: int = 60
     ALGORITHM: str = "HS256"
 
     # Evolution / WhatsApp (optional — Phase 3). README: EVOLUTION_API_URL

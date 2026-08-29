@@ -108,6 +108,15 @@
 
   <h5 class="mb-3">Dashboard</h5>
 
+  <div class="alert alert-danger rounded-4 d-none align-items-center gap-3" id="dashNegStock" role="alert">
+    <span class="material-icons-outlined">report_problem</span>
+    <div class="flex-grow-1">
+      <div class="fw-semibold" id="dashNegStockTitle"></div>
+      <div class="small" id="dashNegStockNames"></div>
+    </div>
+    <a class="btn btn-sm btn-danger rounded-3 text-nowrap" href="/menu/inventory?stock=negative">Review Raw materials</a>
+  </div>
+
   <div class="card rounded-4 mb-3">
     <div class="card-body row g-2 align-items-end">
       <div class="col-md-3">
@@ -482,6 +491,31 @@
     });
   }
 
+  async function loadNegativeStock() {
+    var box = document.getElementById('dashNegStock');
+    var res = await PodCafe.apiFetch('/api/v1/dashboard/negative-stock');
+    if (!res.ok) {
+      box.classList.add('d-none');
+      return;
+    }
+    var rows = await res.json();
+    if (!rows.length) {
+      box.classList.add('d-none');
+      box.classList.remove('d-flex');
+      return;
+    }
+    document.getElementById('dashNegStockTitle').textContent =
+      rows.length === 1
+        ? '1 ingredient is in negative stock — review Raw materials'
+        : rows.length + ' ingredients are in negative stock — review Raw materials';
+    document.getElementById('dashNegStockNames').textContent =
+      rows.slice(0, 6).map(function (r) {
+        return r.name + ' (' + Number(r.current_stock).toFixed(3) + ' ' + r.unit + ')';
+      }).join(' · ') + (rows.length > 6 ? ' · +' + (rows.length - 6) + ' more' : '');
+    box.classList.remove('d-none');
+    box.classList.add('d-flex');
+  }
+
   async function loadPeak() {
     var box = document.getElementById('dashPeak');
     var res = await PodCafe.apiFetch('/api/v1/dashboard/peak-hours?' + rangeQuery());
@@ -524,6 +558,7 @@
       loadTop(),
       loadWaste(),
       loadAlerts(),
+      loadNegativeStock(),
       loadPeak()
     ]);
   }

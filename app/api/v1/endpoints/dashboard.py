@@ -131,3 +131,13 @@ def inventory_alerts(
 ):
     items = dashboard_service.inventory_alerts(db)
     return [InventoryAlertOut.model_validate(x) for x in items]
+
+
+@router.get("/negative-stock", response_model=list[InventoryAlertOut])
+def negative_stock(
+    db: Session = Depends(get_db),
+    _: User = Depends(_admin),
+):
+    """Ingredients sold below zero. Admin-only; never surfaced to cashiers."""
+    items = dashboard_service.negative_stock_materials(db)
+    return [InventoryAlertOut.model_validate(x) for x in items]

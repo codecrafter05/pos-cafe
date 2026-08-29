@@ -70,41 +70,6 @@ def adjust_raw_material_stock(
     return rm
 
 
-def _assert_recipe_lines_stock(
-    db: Session,
-    lines,
-    quantity: int,
-    reserved: dict[int, Decimal],
-) -> Decimal:
-    unit_cost = Decimal("0")
-    for line in lines:
-        rm = (
-            db.query(RawMaterial)
-            .filter(RawMaterial.id == line.raw_material_id)
-            .with_for_update()
-            .first()
-        )
-        if rm is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Recipe references missing raw material id {line.raw_material_id}",
-            )
-        qty_needed = line.quantity_used * Decimal(quantity)
-        already = reserved.get(rm.id, Decimal("0"))
-        required = already + qty_needed
-        if rm.current_stock < required:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Insufficient stock for “{rm.name}”: need {required} {rm.unit}, "
-                    f"have {rm.current_stock}"
-                ),
-            )
-        reserved[rm.id] = required
-        unit_cost += line.quantity_used * rm.cost_per_unit
-    return unit_cost
-
-
 def _deduct_recipe_lines(
     db: Session,
     lines,
@@ -113,6 +78,13 @@ def _deduct_recipe_lines(
     order_item_id: int | None,
     notes: str,
 ) -> Decimal:
+    """Deduct recipe materials and return the cost of one unit.
+
+    Stock is allowed to go below zero. Staff do not keep inventory perfectly up
+    to date, and refusing a sale over a stale stock number costs a real order and
+    confuses the cashier. The shortfall stays visible to the owner as a negative
+    balance on the Raw materials page and the Dashboard alert.
+    """
     unit_cost = Decimal("0")
     for line in lines:
         rm = (
@@ -128,14 +100,6 @@ def _deduct_recipe_lines(
             )
         qty_needed = line.quantity_used * Decimal(quantity)
         unit_cost += line.quantity_used * rm.cost_per_unit
-        if rm.current_stock < qty_needed:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Insufficient stock for “{rm.name}”: need {qty_needed} {rm.unit}, "
-                    f"have {rm.current_stock}"
-                ),
-            )
         rm.current_stock -= qty_needed
         record_movement(
             db,
@@ -179,37 +143,6 @@ def _product_recipe_lines(
     if not skip_raw_material_ids:
         return lines
     return [line for line in lines if line.raw_material_id not in skip_raw_material_ids]
-
-
-def assert_sufficient_stock_for_product(
-    db: Session,
-    *,
-    product_id: int,
-    quantity: int,
-    reserved: dict[int, Decimal],
-    skip_raw_material_ids: set[int] | None = None,
-) -> Decimal:
-    """Confirm recipe materials exist and stock covers this line plus earlier
-    lines in the same order. Does not deduct. ``reserved`` is mutated with
-    additional raw-material quantities this line would consume.
-    """
-    lines = _product_recipe_lines(db, product_id, skip_raw_material_ids)
-    return _assert_recipe_lines_stock(db, lines, quantity, reserved)
-
-
-def assert_sufficient_stock_for_modifiers(
-    db: Session,
-    *,
-    modifiers: list[ProductModifier],
-    quantity: int,
-    reserved: dict[int, Decimal],
-) -> Decimal:
-    """Same reservation rules as the base recipe, for optional modifier ingredients."""
-    if not modifiers:
-        return Decimal("0")
-    ids = [m.id for m in modifiers]
-    lines = db.query(ModifierRecipe).filter(ModifierRecipe.modifier_id.in_(ids)).all()
-    return _assert_recipe_lines_stock(db, lines, quantity, reserved)
 
 
 def apply_sale_deduction_for_product(
