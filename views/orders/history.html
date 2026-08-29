@@ -149,14 +149,6 @@
     return (o && o.daily_order_number != null) ? o.daily_order_number : '—';
   }
 
-  function fmtWhen(iso) {
-    try {
-      var d = new Date(iso);
-      if (isNaN(d.getTime())) return esc(iso);
-      return d.toLocaleString();
-    } catch (e) { return esc(iso); }
-  }
-
   function modsHtml(mods) {
     if (!mods || (Array.isArray(mods) && !mods.length)) return '';
     var list = Array.isArray(mods) ? mods : [];
@@ -180,7 +172,7 @@
     document.getElementById('viewModalTitle').textContent = 'Order #' + dailyNum(o);
     var meta = document.getElementById('viewMeta');
     meta.innerHTML =
-      '<div class="col-md-6"><span class="text-secondary">Created</span><div class="fw-semibold">' + fmtWhen(o.created_at) + '</div></div>' +
+      '<div class="col-md-6"><span class="text-secondary">Created</span><div class="fw-semibold">' + PodCafe.fmtDateTime(o.created_at) + '</div></div>' +
       '<div class="col-md-6"><span class="text-secondary">Staff</span><div class="fw-semibold">' + esc(o.staff_username || ('#' + o.user_id)) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Payment</span><div class="fw-semibold">' + esc(PodCafe.paymentLabel(o.payment_method)) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Source</span><div class="fw-semibold">' + esc(o.source) + '</div></div>' +
@@ -297,7 +289,7 @@
       var stVal = String(r.status || 'delivered').replace(/"/g, '&quot;');
       tr.innerHTML =
         '<td class="fw-semibold">#' + dailyNum(r) + '</td>' +
-        '<td class="text-secondary small">' + fmtWhen(r.created_at) + '</td>' +
+        '<td class="text-secondary small">' + PodCafe.fmtDateTime(r.created_at) + '</td>' +
         '<td class="text-end fw-semibold">' + PodCafe.currency(r.total_amount) + '</td>' +
         '<td><span class="badge rounded-2 ' +
         (r.source === 'online' ? 'bg-info bg-opacity-25 text-info' : 'bg-light text-secondary') +

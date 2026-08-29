@@ -1,6 +1,6 @@
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.time import UtcDateTime
 
 
 class ShopSettingsUpdate(BaseModel):
@@ -14,7 +14,7 @@ class ShopSettingsOut(BaseModel):
     phone_number: str | None
     logo_url: str | None
     payment_qr_url: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     model_config = ConfigDict(from_attributes=True)

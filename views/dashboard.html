@@ -537,7 +537,7 @@
       var row = document.createElement('div');
       row.className = 'mb-2';
       row.innerHTML =
-        '<div class="d-flex justify-content-between"><span>' + r.hour + ':00</span><span class="text-secondary">' +
+        '<div class="d-flex justify-content-between"><span>' + PodCafe.fmtHour12(r.hour) + '</span><span class="text-secondary">' +
         r.orders + ' orders</span></div>' +
         '<div class="progress" style="height:6px;"><div class="progress-bar" style="width:' + pct + '%"></div></div>';
       box.appendChild(row);

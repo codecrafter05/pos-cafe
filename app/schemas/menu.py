@@ -1,7 +1,8 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.time import UtcDateTime
 
 
 class CategoryBase(BaseModel):
@@ -24,7 +25,7 @@ class CategoryUpdate(BaseModel):
 
 class CategoryOut(CategoryBase):
     id: int
-    created_at: datetime
+    created_at: UtcDateTime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,7 +90,7 @@ class RawMaterialUpdate(BaseModel):
 
 class RawMaterialOut(RawMaterialBase):
     id: int
-    created_at: datetime
+    created_at: UtcDateTime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -124,7 +125,7 @@ class ProductUpdate(BaseModel):
 class ProductOut(ProductBase):
     id: int
     cost_price: Decimal
-    created_at: datetime
+    created_at: UtcDateTime
     modifiers: list[ModifierOut] = []
     recipe: list[RecipeLineOut] = []
 

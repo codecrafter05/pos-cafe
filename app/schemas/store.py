@@ -1,9 +1,9 @@
-from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.time import UtcDateTime
 from app.schemas.orders import OrderItemIn
 
 GulfPhoneCountry = Literal["BH", "SA", "AE", "KW", "OM", "QA"]
@@ -59,7 +59,7 @@ class StoreOrderCreatedOut(BaseModel):
     daily_order_number: int
     status: str
     total_amount: Decimal
-    created_at: datetime
+    created_at: UtcDateTime
 
 
 class PublicOrderStatusOut(BaseModel):
@@ -67,7 +67,7 @@ class PublicOrderStatusOut(BaseModel):
     daily_order_number: int
     status: str
     total_amount: Decimal
-    created_at: datetime
+    created_at: UtcDateTime
     source: str
 
     model_config = ConfigDict(from_attributes=True)

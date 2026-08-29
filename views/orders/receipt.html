@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="/static/js/auth-gate.js" data-podcafe-gate="protected"></script>
+  <script src="/static/js/auth-gate.js?v={{ asset_version }}" data-podcafe-gate="protected"></script>
   <title>Receipt</title>
   <link rel="icon" href="/assets/images/favicon-32x32.png" type="image/png">
   <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
@@ -98,7 +98,7 @@
   <div class="receipt-sheet" id="sheet">
     <p class="text-center text-secondary small mb-0" id="loadMsg">Loading receipt…</p>
   </div>
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v={{ asset_version }}"></script>
   <script>
   (function () {
     var orderId = {{ order_id | int }};
@@ -108,22 +108,6 @@
       return String(s || '').replace(/[&<>"']/g, function (c) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
       });
-    }
-
-    function fmtBh(iso) {
-      try {
-        return new Date(iso).toLocaleString('en-GB', {
-          timeZone: 'Asia/Bahrain',
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        });
-      } catch (e) {
-        return esc(iso);
-      }
     }
 
     function payLabel(m) {
@@ -190,7 +174,7 @@
         '</div>' +
         '<div class="receipt-meta mb-3">' +
           '<div><strong>Order #' + dailyNum + '</strong></div>' +
-          '<div>' + fmtBh(o.created_at) + '</div>' +
+          '<div>' + PodCafe.fmtDateTime(o.created_at) + '</div>' +
           '<div>Payment: ' + esc(payLabel(o.payment_method)) + '</div>' +
           (o.customer_name ? '<div>Customer: ' + esc(o.customer_name) + '</div>' : '') +
         '</div>' +

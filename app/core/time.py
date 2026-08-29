@@ -1,5 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
+from typing import Annotated
 from zoneinfo import ZoneInfo
+
+from pydantic import PlainSerializer
 
 BAHRAIN = ZoneInfo("Asia/Bahrain")
 BAHRAIN_UTC_OFFSET_HOURS = 3  # Asia/Bahrain has no DST
@@ -33,6 +36,26 @@ def as_bahrain(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(BAHRAIN)
+
+
+def iso_utc(dt: datetime) -> str:
+    """Serialize as ISO 8601 with an explicit ``Z``.
+
+    Timestamps are stored naive-UTC. Without the marker, ``new Date(iso)`` in a
+    browser follows the ECMAScript rule for date-times lacking an offset and
+    reads the value as *local* time, so every UTC timestamp renders three hours
+    early in Bahrain. The ``Z`` is what makes the instant unambiguous.
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+UtcDateTime = Annotated[
+    datetime,
+    PlainSerializer(iso_utc, return_type=str, when_used="json"),
+]
+"""A stored-UTC datetime that goes over JSON with an explicit ``Z`` marker."""
 
 
 def period_bounds_utc(period: str) -> tuple[datetime, datetime]:

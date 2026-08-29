@@ -11,6 +11,25 @@ templates = Jinja2Templates(directory=str(PROJECT_ROOT / "views"))
 STORE_ORDERING_ENABLED = False
 
 
+def _asset_version() -> str:
+    """Cache-busting stamp taken from the newest local JS/CSS file.
+
+    Nginx serves /static without Cache-Control, so browsers fall back to
+    heuristic freshness and keep an old bundle for hours. Appending this to the
+    asset URLs means a deploy reaches returning users immediately instead of
+    leaving them on a half-updated page. Computed once per process, which is
+    exactly right: a deploy restarts the service.
+    """
+    newest = 0.0
+    for path in (PROJECT_ROOT / "static").rglob("*"):
+        if path.suffix in (".js", ".css") and path.is_file():
+            newest = max(newest, path.stat().st_mtime)
+    return str(int(newest))
+
+
+templates.env.globals["asset_version"] = _asset_version()
+
+
 def shop_public_dict() -> dict:
     db = SessionLocal()
     try:

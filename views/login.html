@@ -89,8 +89,8 @@
 
   <script src="/assets/js/jquery.min.js"></script>
   <script src="/assets/js/bootstrap.bundle.min.js"></script>
-  <script src="/static/js/auth-gate.js"></script>
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/auth-gate.js?v={{ asset_version }}"></script>
+  <script src="/static/js/app.js?v={{ asset_version }}"></script>
   <script>
     if (window.PodCafeAuth) PodCafeAuth.discardInvalidToken();
     if (window.PodCafeAuth && PodCafeAuth.isAccessTokenValid()) {

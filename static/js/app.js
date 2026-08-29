@@ -35,6 +35,45 @@
     );
   }
 
+  // Timestamps arrive from the API as UTC with an explicit "Z". Display is pinned
+  // to Bahrain rather than the viewer's own zone, because the backend already
+  // partitions daily order numbers by Bahrain calendar day — a browser in another
+  // zone would otherwise show a receipt under a different date than its number.
+  var DISPLAY_TZ = 'Asia/Bahrain';
+  var DATE_OPTS = { timeZone: DISPLAY_TZ, day: '2-digit', month: 'short', year: 'numeric' };
+  var TIME_OPTS = { timeZone: DISPLAY_TZ, hour: 'numeric', minute: '2-digit', hour12: true };
+
+  function parseWhen(iso) {
+    if (!iso) return null;
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function fmtDate(iso) {
+    var d = parseWhen(iso);
+    return d ? d.toLocaleDateString('en-GB', DATE_OPTS) : '—';
+  }
+
+  // en-US keeps the AM/PM uppercase; en-GB renders it lowercase.
+  function fmtTime(iso) {
+    var d = parseWhen(iso);
+    return d ? d.toLocaleTimeString('en-US', TIME_OPTS) : '—';
+  }
+
+  function fmtDateTime(iso) {
+    var d = parseWhen(iso);
+    if (!d) return '—';
+    return d.toLocaleDateString('en-GB', DATE_OPTS) + ', ' + d.toLocaleTimeString('en-US', TIME_OPTS);
+  }
+
+  // Bare Bahrain hour bucket (0–23) from the peak-hours aggregate → "6 PM".
+  function fmtHour12(hour) {
+    var h = Number(hour);
+    if (!Number.isFinite(h)) return '—';
+    h = ((Math.trunc(h) % 24) + 24) % 24;
+    return (h % 12 === 0 ? 12 : h % 12) + (h < 12 ? ' AM' : ' PM');
+  }
+
   function unauthorizedResponse() {
     return new Response('{}', {
       status: 401,
@@ -237,6 +276,10 @@
     payloadFromToken: payloadFromToken,
     currency: currency,
     paymentLabel: paymentLabel,
+    fmtDate: fmtDate,
+    fmtTime: fmtTime,
+    fmtDateTime: fmtDateTime,
+    fmtHour12: fmtHour12,
     apiFetch: apiFetch,
     apiUpload: apiUpload,
     toast: toast,

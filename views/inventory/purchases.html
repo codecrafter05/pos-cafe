@@ -131,13 +131,13 @@
     rows.forEach(function (x) {
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="text-secondary small">' + esc(x.purchased_at) + '</td>' +
+        '<td class="text-secondary small">' + PodCafe.fmtDateTime(x.purchased_at) + '</td>' +
         '<td class="fw-semibold">' + esc(idToName[x.raw_material_id] || ('#' + x.raw_material_id)) + '</td>' +
         '<td class="text-end">' + Number(x.quantity).toFixed(3) + '</td>' +
         '<td class="text-end">' + PodCafe.currency(x.unit_cost) + '</td>' +
         '<td class="text-end">' + PodCafe.currency(x.total_cost) + '</td>' +
         '<td class="text-end">' +
-          '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 pur-del" data-id="' + x.id + '" data-summary="' + escAttr((idToName[x.raw_material_id] || '#' + x.raw_material_id) + ' · ' + String(x.purchased_at)) + '">Delete</button>' +
+          '<button type="button" class="btn btn-sm btn-outline-danger rounded-3 pur-del" data-id="' + x.id + '" data-summary="' + escAttr((idToName[x.raw_material_id] || '#' + x.raw_material_id) + ' · ' + PodCafe.fmtDateTime(x.purchased_at)) + '">Delete</button>' +
         '</td>';
       tb.appendChild(tr);
     });

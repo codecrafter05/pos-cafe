@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="/static/js/auth-gate.js" data-podcafe-gate="protected"></script>
+  <script src="/static/js/auth-gate.js?v={{ asset_version }}" data-podcafe-gate="protected"></script>
   <script>
   (function () {
     try {
@@ -62,7 +62,7 @@
   <script src="/assets/plugins/metismenu/metisMenu.min.js"></script>
   <script src="/assets/plugins/simplebar/js/simplebar.min.js"></script>
   <script src="/assets/js/main.js"></script>
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v={{ asset_version }}"></script>
 
   <script>
     $(function () { $('#sidenav').metisMenu(); });
@@ -111,6 +111,7 @@
     (function () {
       var el = document.getElementById('currentDate');
       if (el) el.textContent = new Date().toLocaleDateString('en-GB', {
+        timeZone: 'Asia/Bahrain',
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
       });
     })();

@@ -1,10 +1,10 @@
-from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.payments import InPersonPaymentMethod
+from app.core.time import UtcDateTime
 
 
 class OrderModifierSnapshot(BaseModel):
@@ -64,7 +64,7 @@ class OrderOut(BaseModel):
     source: str
     status: str
     notes: str | None
-    created_at: datetime
+    created_at: UtcDateTime
     items: list[OrderItemOut] = []
 
     model_config = ConfigDict(from_attributes=True)

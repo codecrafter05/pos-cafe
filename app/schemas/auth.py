@@ -1,7 +1,8 @@
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
+
+from app.core.time import UtcDateTime
 
 
 class LoginRequest(BaseModel):
@@ -29,14 +30,14 @@ class UserOut(BaseModel):
     username: str
     role: str
     is_active: bool
-    created_at: datetime
+    created_at: UtcDateTime
 
     model_config = {"from_attributes": True}
 
 
 class DeviceSessionOut(BaseModel):
     id: int
-    created_at: datetime
-    last_used_at: datetime | None
-    expires_at: datetime
+    created_at: UtcDateTime
+    last_used_at: UtcDateTime | None
+    expires_at: UtcDateTime
     revoked: bool

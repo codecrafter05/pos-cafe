@@ -1,8 +1,9 @@
-from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.time import UtcDateTime
 
 Period = Literal["today", "week", "month"]
 
@@ -118,7 +119,7 @@ class PurchaseOut(BaseModel):
     quantity: Decimal
     unit_cost: Decimal
     total_cost: Decimal
-    purchased_at: datetime
+    purchased_at: UtcDateTime
     notes: str | None
 
     model_config = ConfigDict(from_attributes=True)
@@ -148,6 +149,6 @@ class UserListOut(BaseModel):
     username: str
     role: str
     is_active: bool
-    created_at: datetime
+    created_at: UtcDateTime
 
     model_config = ConfigDict(from_attributes=True)
