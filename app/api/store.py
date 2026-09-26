@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
+from app.core.templating import PUBLIC_STORE_ENABLED
 from app.models.category import Category
 from app.models.order import Order
 from app.models.product import Product
@@ -28,8 +29,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _require_public_store() -> None:
+    if not PUBLIC_STORE_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="This store is currently unavailable",
+        )
+
+
 @router.get("/menu", response_model=StoreMenuOut)
 def get_store_menu(db: Session = Depends(get_db)):
+    _require_public_store()
     cats = (
         db.query(Category)
         .filter(Category.is_active.is_(True))
@@ -72,6 +82,7 @@ def get_store_menu(db: Session = Depends(get_db)):
 
 @router.post("/orders", response_model=StoreOrderCreatedOut)
 def create_store_order(body: StoreOrderCreate, db: Session = Depends(get_db)):
+    _require_public_store()
     phone = whatsapp_service.compose_gulf_whatsapp(
         body.whatsapp_country, body.whatsapp_phone
     )
@@ -117,6 +128,7 @@ def create_store_order(body: StoreOrderCreate, db: Session = Depends(get_db)):
 
 @router.get("/orders/{order_id}/status", response_model=PublicOrderStatusOut)
 def get_public_order_status(order_id: int, db: Session = Depends(get_db)):
+    _require_public_store()
     order = db.get(Order, order_id)
     if order is None or order.source != "online":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")

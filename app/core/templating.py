@@ -10,6 +10,9 @@ templates = Jinja2Templates(directory=str(PROJECT_ROOT / "views"))
 # Public /store: set True to show Add buttons and Cart when online ordering launches.
 STORE_ORDERING_ENABLED = False
 
+# Public /store pages and /api/store. False suspends the customer store.
+PUBLIC_STORE_ENABLED = True
+
 
 def _asset_version() -> str:
     """Cache-busting stamp taken from the newest local JS/CSS file.

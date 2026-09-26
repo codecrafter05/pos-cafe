@@ -498,3 +498,19 @@ body.store-page.store-ordering-on .store-header__inner {
     padding-top: 1.45rem;
   }
 }
+
+.store-unavailable {
+  min-height: 48vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1.25rem;
+}
+
+.store-unavailable p {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--store-ink-soft);
+}

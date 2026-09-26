@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.core.templating import render
+from app.core.templating import PUBLIC_STORE_ENABLED, render
 
 router = APIRouter(tags=["web"])
 
@@ -92,16 +92,28 @@ def settings_page(request: Request):
     return render_protected(request, "settings/index.html")
 
 
+def render_store_unavailable(request: Request):
+    response = render(request, "store/unavailable.html")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    return response
+
+
 @router.get("/store", response_class=HTMLResponse, include_in_schema=False)
 def store_menu_page(request: Request):
+    if not PUBLIC_STORE_ENABLED:
+        return render_store_unavailable(request)
     return render(request, "store/index.html")
 
 
 @router.get("/store/cart", response_class=HTMLResponse, include_in_schema=False)
 def store_cart_page(request: Request):
+    if not PUBLIC_STORE_ENABLED:
+        return render_store_unavailable(request)
     return render(request, "store/cart.html")
 
 
 @router.get("/store/confirmation", response_class=HTMLResponse, include_in_schema=False)
 def store_confirmation_page(request: Request):
+    if not PUBLIC_STORE_ENABLED:
+        return render_store_unavailable(request)
     return render(request, "store/confirmation.html")
