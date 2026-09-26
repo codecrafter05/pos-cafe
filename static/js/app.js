@@ -257,8 +257,8 @@
     initThemePicker();
   }
 
-  // In-person sales are cash or Benefit (Bahrain's debit network); card and
-  // transfer remain for online-store and historical orders.
+  // In-person sales are cash, Benefit (Bahrain's debit network), or a physical
+  // card terminal. Transfer remains an online-store value.
   var PAYMENT_LABELS = {
     cash: 'Cash',
     benefit: 'Benefit',

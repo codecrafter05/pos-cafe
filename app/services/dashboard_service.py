@@ -6,7 +6,7 @@ from typing import Literal
 from sqlalchemy import extract, func, text
 from sqlalchemy.orm import Session
 
-from app.core.payments import payment_label
+from app.core.payments import IN_PERSON_PAYMENT_METHODS, payment_label
 from app.core.time import (
     as_bahrain,
     bahrain_range_utc,
@@ -228,7 +228,11 @@ def negative_stock_materials(db: Session) -> list[RawMaterial]:
 
 
 def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]:
-    """Revenue split by how the customer paid, biggest earner first."""
+    """Revenue split by how the customer paid, biggest earner first.
+
+    When the range has any sales, every in-person method is listed — including
+    Card — so a method with no takings still appears at zero.
+    """
     rows = (
         db.query(
             Order.payment_method.label("payment_method"),
@@ -254,7 +258,21 @@ def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]
         }
         for row in rows
     ]
-    out.sort(key=lambda r: r["revenue"], reverse=True)
+    if out:
+        present = {row["payment_method"] for row in out}
+        for method in IN_PERSON_PAYMENT_METHODS:
+            if method not in present:
+                out.append(
+                    {
+                        "payment_method": method,
+                        "label": payment_label(method),
+                        "orders": 0,
+                        "revenue": Decimal("0"),
+                        "profit": Decimal("0"),
+                    }
+                )
+    rank = {method: index for index, method in enumerate(IN_PERSON_PAYMENT_METHODS)}
+    out.sort(key=lambda r: (-r["revenue"], rank.get(r["payment_method"], len(rank)), r["label"]))
     return out
 
 

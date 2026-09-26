@@ -24,8 +24,7 @@ class Order(Base):
     total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     total_cost: Mapped[Decimal] = mapped_column(Numeric(10, 3), default=Decimal("0"), nullable=False)
     profit: Mapped[Decimal] = mapped_column(Numeric(10, 3), default=Decimal("0"), nullable=False)
-    # In-person: cash | benefit. Online store also uses card | transfer, and
-    # pre-2026 orders may still hold those values.
+    # In-person: cash | benefit | card. Online store also uses transfer.
     payment_method: Mapped[str] = mapped_column(String(20), nullable=False)
     source: Mapped[str] = mapped_column(
         String(20), default="pos", nullable=False
