@@ -1,10 +1,11 @@
 from datetime import date
 import logging
+import math
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import require_roles
 from app.core.database import get_db
@@ -13,7 +14,13 @@ from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.user import User
 from app.schemas.dashboard import OrderStatusUpdate
-from app.schemas.orders import OrderCreate, OrderItemLineStatusUpdate, OrderItemOut, OrderOut
+from app.schemas.orders import (
+    OrderCreate,
+    OrderItemLineStatusUpdate,
+    OrderItemOut,
+    OrderListOut,
+    OrderOut,
+)
 from app.services import inventory_service, order_service, whatsapp_service
 from app.services.order_numbering import daily_order_number_for, daily_order_numbers_by_id
 
@@ -51,15 +58,14 @@ def _orders_to_out(db: Session, orders: list[Order]) -> list[OrderOut]:
     return [_order_to_out(db, o, numbers.get(o.id)) for o in orders]
 
 
-@router.get("", response_model=list[OrderOut])
-def list_orders(
-    db: Session = Depends(get_db),
-    user: User = Depends(_staff),
-    date_from: date | None = Query(None),
-    date_to: date | None = Query(None),
-    status_filter: str | None = Query(None, alias="status"),
+def _history_query(
+    db: Session,
+    user: User,
+    date_from: date | None,
+    date_to: date | None,
+    status_filter: str | None,
 ):
-    q = db.query(Order).options(joinedload(Order.items))
+    q = db.query(Order)
     if user.role == "cashier":
         q = q.filter(or_(Order.user_id == user.id, Order.source == "online"))
     if date_from is not None or date_to is not None:
@@ -69,8 +75,37 @@ def list_orders(
         q = q.filter(Order.created_at >= start, Order.created_at < end)
     if status_filter:
         q = q.filter(Order.status == status_filter)
-    orders = q.order_by(Order.created_at.desc()).limit(500).all()
-    return _orders_to_out(db, orders)
+    return q
+
+
+@router.get("", response_model=OrderListOut)
+def list_orders(
+    db: Session = Depends(get_db),
+    user: User = Depends(_staff),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    status_filter: str | None = Query(None, alias="status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=100),
+):
+    q = _history_query(db, user, date_from, date_to, status_filter)
+    total = q.order_by(None).count()
+    total_pages = math.ceil(total / page_size) if total else 0
+    orders = (
+        q.options(selectinload(Order.items).selectinload(OrderItem.product))
+        .order_by(Order.created_at.desc(), Order.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    # daily_order_number is the rank inside the whole Bahrain day, not this page.
+    return OrderListOut(
+        items=_orders_to_out(db, orders),
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.post("", response_model=OrderOut)

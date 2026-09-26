@@ -50,6 +50,10 @@
         <tbody id="ordBody"></tbody>
       </table>
     </div>
+    <nav class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3 d-none" id="ordPager" aria-label="Order history pages">
+      <div class="small text-secondary" id="ordPagerSummary"></div>
+      <ul class="pagination pagination-sm mb-0 flex-wrap" id="ordPagerList"></ul>
+    </nav>
     <div class="alert alert-danger mt-3 d-none rounded-3" id="ordErr"></div>
   </div>
 </div>
@@ -162,6 +166,9 @@
   }
 
   var viewOrderId = null;
+  var currentPage = 1;
+  var PAGE_SIZE = 24;
+  var loadSeq = 0;
 
   function lineStatusOf(it) {
     return String(it.line_status || 'sold');
@@ -250,7 +257,7 @@
     var o = await res.json();
     renderView(o);
     PodCafe.toast(status === 'wasted' ? 'Item marked as waste' : 'Item cancelled', 'success');
-    load();
+    load(currentPage);
   }
 
   async function openView(id) {
@@ -264,26 +271,92 @@
     new bootstrap.Modal(document.getElementById('viewModal')).show();
   }
 
-  async function load() {
-    var q = [];
+  function pageTokens(current, totalPages) {
+    if (totalPages <= 9) {
+      var all = [];
+      for (var n = 1; n <= totalPages; n++) all.push(n);
+      return all;
+    }
+    var tokens = [1];
+    var left = Math.max(2, current - 2);
+    var right = Math.min(totalPages - 1, current + 2);
+    if (left > 2) tokens.push('ellipsis');
+    for (var i = left; i <= right; i++) tokens.push(i);
+    if (right < totalPages - 1) tokens.push('ellipsis');
+    tokens.push(totalPages);
+    return tokens;
+  }
+
+  function renderPager(page, total, pageSize, totalPages) {
+    var nav = document.getElementById('ordPager');
+    var summary = document.getElementById('ordPagerSummary');
+    var list = document.getElementById('ordPagerList');
+    if (totalPages <= 1) {
+      nav.classList.add('d-none');
+      list.innerHTML = '';
+      summary.textContent = '';
+      return;
+    }
+    var start = (page - 1) * pageSize + 1;
+    var end = Math.min(page * pageSize, total);
+    summary.textContent = 'Showing ' + start + '–' + end + ' of ' + total;
+    var html = '';
+    html += '<li class="page-item' + (page <= 1 ? ' disabled' : '') + '">' +
+      '<button type="button" class="page-link" data-page="' + (page - 1) + '"' +
+      (page <= 1 ? ' disabled' : '') + '>Previous</button></li>';
+    pageTokens(page, totalPages).forEach(function (token) {
+      if (token === 'ellipsis') {
+        html += '<li class="page-item disabled"><span class="page-link">…</span></li>';
+        return;
+      }
+      var active = token === page;
+      html += '<li class="page-item' + (active ? ' active' : '') + '">' +
+        '<button type="button" class="page-link" data-page="' + token + '"' +
+        (active ? ' aria-current="page"' : '') + '>' + token + '</button></li>';
+    });
+    html += '<li class="page-item' + (page >= totalPages ? ' disabled' : '') + '">' +
+      '<button type="button" class="page-link" data-page="' + (page + 1) + '"' +
+      (page >= totalPages ? ' disabled' : '') + '>Next</button></li>';
+    list.innerHTML = html;
+    nav.classList.remove('d-none');
+  }
+
+  async function load(page) {
+    page = page || 1;
+    currentPage = page;
+    var seq = ++loadSeq;
+    var tb = document.getElementById('ordBody');
+    var err = document.getElementById('ordErr');
+    err.classList.add('d-none');
+    tb.innerHTML = '<tr><td colspan="6" class="text-secondary text-center py-4">Loading orders…</td></tr>';
+    var q = ['page=' + encodeURIComponent(page), 'page_size=' + PAGE_SIZE];
     var f = document.getElementById('fltFrom').value;
     var t = document.getElementById('fltTo').value;
     var st = document.getElementById('fltStatus').value;
     if (f) q.push('date_from=' + encodeURIComponent(f));
     if (t) q.push('date_to=' + encodeURIComponent(t));
     if (st) q.push('status=' + encodeURIComponent(st));
-    var url = '/api/v1/orders' + (q.length ? ('?' + q.join('&')) : '');
-    var res = await PodCafe.apiFetch(url);
-    var err = document.getElementById('ordErr');
-    err.classList.add('d-none');
+    var res = await PodCafe.apiFetch('/api/v1/orders?' + q.join('&'));
+    if (seq !== loadSeq) return;
     if (!res.ok) {
+      tb.innerHTML = '';
       err.textContent = 'Failed to load orders';
       err.classList.remove('d-none');
       return;
     }
-    var rows = await res.json();
-    var tb = document.getElementById('ordBody');
+    var data = await res.json();
+    var rows = data.items || [];
+    var totalPages = Number(data.total_pages || 0);
+    if (!rows.length && page > 1 && totalPages > 0 && page > totalPages) {
+      load(totalPages);
+      return;
+    }
     tb.innerHTML = '';
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="6" class="text-secondary text-center py-4">No orders in this range.</td></tr>';
+      renderPager(page, Number(data.total || 0), Number(data.page_size || PAGE_SIZE), totalPages);
+      return;
+    }
     rows.forEach(function (r) {
       var tr = document.createElement('tr');
       var stVal = String(r.status || 'delivered').replace(/"/g, '&quot;');
@@ -328,6 +401,7 @@
         deleteOrder(btn.getAttribute('data-id'), btn.getAttribute('data-daily'));
       });
     });
+    renderPager(page, Number(data.total || 0), Number(data.page_size || PAGE_SIZE), totalPages);
   }
 
   async function deleteOrder(id, daily) {
@@ -343,26 +417,34 @@
       return;
     }
     PodCafe.toast('Order deleted', 'success');
-    load();
+    load(currentPage);
   }
+
+  document.getElementById('ordPagerList').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-page]');
+    if (!btn || btn.disabled) return;
+    var next = Number(btn.getAttribute('data-page'));
+    if (!next || next === currentPage || next < 1) return;
+    load(next);
+  });
 
   document.getElementById('fltApply').addEventListener('click', function () {
     syncQuickRange();
-    load();
+    load(1);
   });
   document.getElementById('fltToday').addEventListener('click', function () {
     var t = todayISO();
     document.getElementById('fltFrom').value = t;
     document.getElementById('fltTo').value = t;
     syncQuickRange();
-    load();
+    load(1);
   });
   document.getElementById('fltYesterday').addEventListener('click', function () {
     var y = yesterdayISO();
     document.getElementById('fltFrom').value = y;
     document.getElementById('fltTo').value = y;
     syncQuickRange();
-    load();
+    load(1);
   });
   document.getElementById('stSave').addEventListener('click', async function () {
     var id = document.getElementById('stOrderId').value;
@@ -380,10 +462,10 @@
     }
     bootstrap.Modal.getInstance(document.getElementById('stModal')).hide();
     PodCafe.toast('Status updated', 'success');
-    load();
+    load(currentPage);
   });
 
-  document.addEventListener('DOMContentLoaded', load);
+  document.addEventListener('DOMContentLoaded', function () { load(1); });
 })();
 </script>
 {% endblock %}
