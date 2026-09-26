@@ -67,6 +67,11 @@ def orders_history_page(request: Request):
     return render_protected(request, "orders/history.html")
 
 
+@router.get("/sync/issues", response_class=HTMLResponse, include_in_schema=False)
+def sync_issues_page(request: Request):
+    return render_protected(request, "sync/issues.html")
+
+
 @router.get("/orders/{order_id}/receipt", response_class=HTMLResponse, include_in_schema=False)
 def order_receipt_page(request: Request, order_id: int):
     return render_protected(request, "orders/receipt.html", {"order_id": order_id})

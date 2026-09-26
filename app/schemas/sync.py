@@ -1,11 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.payments import InPersonPaymentMethod
+from app.core.time import UtcDateTime
 from app.schemas.orders import OrderItemIn
 
 
@@ -83,3 +84,14 @@ class SyncOrderResult(BaseModel):
 
 class SyncOrdersResponse(BaseModel):
     results: list[SyncOrderResult]
+
+
+class SyncRejectionOut(BaseModel):
+    id: int
+    device_id: str | None
+    client_uuid: str
+    attempted_at: UtcDateTime
+    reason: str
+    payload_snapshot: dict[str, Any] | None = None
+
+    model_config = ConfigDict(from_attributes=True)

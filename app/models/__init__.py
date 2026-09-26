@@ -10,6 +10,7 @@ from app.models.purchase import Purchase
 from app.models.raw_material import RawMaterial
 from app.models.refresh_token import RefreshToken
 from app.models.shop_settings import ShopSettings
+from app.models.sync_rejection import SyncRejection
 from app.models.user import User
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "RawMaterial",
     "RefreshToken",
     "ShopSettings",
+    "SyncRejection",
     "User",
 ]

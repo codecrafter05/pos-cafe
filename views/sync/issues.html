@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}{{ shop.cafe_name }} — Sync issues{% endblock %}
+
+{% block content %}
+<h5 class="mb-1">Sync issues</h5>
+<p class="text-secondary small mb-3">Device orders the handheld tried to save and the server refused.</p>
+
+<div class="card rounded-4">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Device</th>
+            <th>Reason</th>
+            <th>Attempted items</th>
+          </tr>
+        </thead>
+        <tbody id="rejBody"></tbody>
+      </table>
+    </div>
+    <div class="alert alert-danger mt-3 d-none rounded-3" id="rejErr"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var p = PodCafe.payloadFromToken(PodCafe.getToken());
+  if (p && p.role === 'cashier') {
+    window.location.replace('/pos');
+    return;
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]);
+    });
+  }
+
+  function itemsText(snap) {
+    var items = (snap && snap.items) || [];
+    if (!items.length) return '—';
+    return items.map(function (it) {
+      var name = it.product_name || ('#' + it.product_id);
+      var mods = (it.modifiers || []).map(function (m) {
+        var label = m.option_name || '';
+        if (m.group_name) label = m.group_name + ': ' + label;
+        return label;
+      }).filter(Boolean);
+      return it.quantity + ' × ' + name + (mods.length ? ' (' + mods.join(', ') + ')' : '');
+    }).join('; ');
+  }
+
+  async function load() {
+    var tb = document.getElementById('rejBody');
+    var err = document.getElementById('rejErr');
+    err.classList.add('d-none');
+    tb.innerHTML = '<tr><td colspan="4" class="text-secondary text-center py-4">Loading…</td></tr>';
+    var res = await PodCafe.apiFetch('/api/v1/sync/rejections');
+    if (!res.ok) {
+      tb.innerHTML = '';
+      err.textContent = 'Could not load sync issues';
+      err.classList.remove('d-none');
+      return;
+    }
+    var rows = await res.json();
+    tb.innerHTML = '';
+    if (!rows.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="text-secondary text-center py-4">No rejected device orders.</td></tr>';
+      return;
+    }
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="text-nowrap"><div class="fw-semibold">' + PodCafe.fmtDateTime(r.attempted_at) + '</div>' +
+          '<div class="text-secondary small">' + esc(r.client_uuid) + '</div></td>' +
+        '<td class="text-secondary small">' + esc(r.device_id || '—') + '</td>' +
+        '<td>' + esc(r.reason) + '</td>' +
+        '<td>' + esc(itemsText(r.payload_snapshot)) + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+})();
+</script>
+{% endblock %}

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from app.core.time import to_naive_utc
 from app.models.category import Category
 from app.models.order import Order
 from app.models.product import Product
+from app.models.sync_rejection import SyncRejection
 from app.models.user import User
 from app.schemas.orders import OrderCreate
 from app.schemas.sync import (
@@ -24,6 +26,8 @@ from app.schemas.sync import (
 from app.services import order_service
 from app.services.order_numbering import daily_order_number_for
 from app.services.shop_settings_service import display_cafe_name, get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _http_detail_reason(exc: HTTPException) -> str:
@@ -124,6 +128,66 @@ def _failed_result(client_uuid: UUID, reason: str) -> SyncOrderResult:
     )
 
 
+def _payload_snapshot(db: Session, payload: DeviceOrderIn) -> dict:
+    """What the device tried to sell, with product names when we still have them."""
+    items = []
+    for line in payload.items:
+        product = db.get(Product, line.product_id)
+        items.append(
+            {
+                "product_id": line.product_id,
+                "product_name": product.name if product is not None else None,
+                "quantity": line.quantity,
+                "modifiers": [mod.model_dump(mode="json") for mod in line.modifiers],
+                "notes": line.notes,
+            }
+        )
+    return {
+        "payment_method": payload.payment_method,
+        "customer_name": payload.customer_name,
+        "customer_phone": payload.customer_phone,
+        "customer_car_plate": payload.customer_car_plate,
+        "notes": payload.notes,
+        "items": items,
+    }
+
+
+def _record_rejection(
+    db: Session,
+    payload: DeviceOrderIn,
+    device_id: str | None,
+    reason: str,
+) -> None:
+    """Persist a failed attempt after the sale transaction has been rolled back.
+
+    A logging failure must not change the failed response the device already earned.
+    """
+    try:
+        db.add(
+            SyncRejection(
+                device_id=device_id,
+                client_uuid=str(payload.client_uuid),
+                attempted_at=to_naive_utc(datetime.now(timezone.utc)),
+                reason=reason,
+                payload_snapshot=_payload_snapshot(db, payload),
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Could not record sync rejection for %s", payload.client_uuid)
+
+
+def _reject(
+    db: Session,
+    payload: DeviceOrderIn,
+    device_id: str | None,
+    reason: str,
+) -> SyncOrderResult:
+    _record_rejection(db, payload, device_id, reason)
+    return _failed_result(payload.client_uuid, reason)
+
+
 def sync_device_orders(
     db: Session,
     user: User,
@@ -175,13 +239,17 @@ def _sync_one_device_order(
         return _success_result(db, payload.client_uuid, order.id)
     except HTTPException as exc:
         db.rollback()
-        return _failed_result(payload.client_uuid, _http_detail_reason(exc))
+        return _reject(db, payload, device_id, _http_detail_reason(exc))
     except IntegrityError:
         db.rollback()
         raced = _existing_by_client_uuid(db, uuid_str)
         if raced is not None:
             return _success_result(db, payload.client_uuid, raced.id)
-        return _failed_result(payload.client_uuid, "Could not save order (duplicate or constraint error)")
+        return _reject(
+            db, payload, device_id, "Could not save order (duplicate or constraint error)"
+        )
     except Exception as exc:
         db.rollback()
-        return _failed_result(payload.client_uuid, str(exc) or "Unexpected error while saving order")
+        return _reject(
+            db, payload, device_id, str(exc) or "Unexpected error while saving order"
+        )
