@@ -184,8 +184,8 @@
       '<div class="col-md-6 mt-2"><span class="text-secondary">Payment</span><div class="fw-semibold">' + esc(PodCafe.paymentLabel(o.payment_method)) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Source</span><div class="fw-semibold">' + esc(o.source) + '</div></div>' +
       '<div class="col-md-6 mt-2"><span class="text-secondary">Status</span><div class="fw-semibold">' + esc(o.status) + '</div></div>' +
-      '<div class="col-md-6 mt-2"><span class="text-secondary">Totals</span><div class="fw-semibold">' +
-        PodCafe.currency(o.total_amount) + ' · cost ' + PodCafe.currency(o.total_cost) + ' · profit ' + PodCafe.currency(o.profit) +
+      '<div class="col-md-6 mt-2"><span class="text-secondary">Total</span><div class="fw-semibold">' +
+        PodCafe.currency(o.total_amount) +
       '</div></div>';
     var cname = o.customer_name || '—';
     var cphone = o.customer_phone || '—';
@@ -241,8 +241,8 @@
   async function setLineStatus(itemId, status) {
     if (!viewOrderId) return;
     var msg = status === 'wasted'
-      ? 'Mark this item as waste? It was prepared and will not go back to inventory. Order totals will drop this sale and keep the ingredient cost as a loss.'
-      : 'Cancel this item? Ingredients will be returned to inventory and it will be removed from the order total.';
+      ? 'Mark this item as waste? It was prepared but not sold, and will be removed from the order total.'
+      : 'Cancel this item? It will be removed from the order total.';
     if (!window.confirm(msg)) return;
     var res = await PodCafe.apiFetch(
       '/api/v1/orders/' + encodeURIComponent(viewOrderId) + '/items/' + encodeURIComponent(itemId) + '/status',

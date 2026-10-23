@@ -66,13 +66,13 @@
     </div>
   </div>
   <div class="col-lg-7">
-    <div class="card rounded-4 mb-3">
+    <div class="card rounded-4">
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h5 class="fw-bold mb-0">Modifiers</h5>
           <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="modAddRow">Add option</button>
         </div>
-        <p class="text-secondary small mb-3">Grouped options (e.g. Size → Large) with optional extra price. Link an ingredient to add extra stock use, or to replace a base-recipe ingredient (e.g. Plant milk instead of cow milk).</p>
+        <p class="text-secondary small mb-3">Grouped options (e.g. Milk → Hazelnut) with an optional extra price added at checkout.</p>
         <div class="table-responsive">
           <table class="table table-sm align-middle">
             <thead><tr><th>Group</th><th>Option</th><th class="text-end">+ Price</th><th></th></tr></thead>
@@ -82,22 +82,6 @@
         <button class="btn btn-outline-secondary rounded-3 btn-sm" type="button" id="modSaveBtn">Save modifiers</button>
       </div>
     </div>
-    <div class="card rounded-4">
-      <div class="card-body">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <h5 class="fw-bold mb-0">Recipe</h5>
-          <button type="button" class="btn btn-sm btn-outline-primary rounded-3" id="recAddRow">Add line</button>
-        </div>
-        <p class="text-secondary small mb-3">Links this product to raw materials for inventory and cost.</p>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead><tr><th>Material</th><th class="text-end">Qty / unit</th><th>Unit</th><th></th></tr></thead>
-            <tbody id="recRows"></tbody>
-          </table>
-        </div>
-        <button class="btn btn-outline-secondary rounded-3 btn-sm" type="button" id="recSaveBtn">Save recipe</button>
-      </div>
-    </div>
   </div>
 </div>
 {% endblock %}
@@ -105,8 +89,6 @@
 {% block extra_js %}
 <script>
 (function () {
-  var mats = [];
-
   function rowDelBtn(cls) {
     return '<button type="button" class="btn btn-sm btn-outline-danger border-0 ' + cls + '"><i class="material-icons-outlined" style="font-size:18px">close</i></button>';
   }
@@ -118,98 +100,20 @@
       .replace(/</g, '&lt;');
   }
 
-  function matOptions(selectedId) {
-    return mats.map(function (x) {
-      return '<option value="' + x.id + '"' + (selectedId && Number(selectedId) === x.id ? ' selected' : '') + '>' + escAttr(x.name) + '</option>';
-    }).join('');
-  }
-
-  function baseRecipeOptions(selectedId) {
-    var seen = {};
-    var html = '<option value="">None (adds extra)</option>';
-    document.querySelectorAll('#recRows tr').forEach(function (tr) {
-      var sel = tr.querySelector('.rec-m');
-      if (!sel) return;
-      var id = Number(sel.value);
-      if (!id || seen[id]) return;
-      seen[id] = true;
-      var name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : ('#' + id);
-      html += '<option value="' + id + '"' + (selectedId && Number(selectedId) === id ? ' selected' : '') + '>' + escAttr(name) + '</option>';
-    });
-    return html;
-  }
-
-  function refreshSubDropdowns() {
-    document.querySelectorAll('.mod-ing-sub').forEach(function (sel) {
-      var current = sel.value;
-      sel.innerHTML = baseRecipeOptions(current);
-    });
-  }
-
-  function addIngLine(container, mid, q, u, substitutesId) {
-    var row = document.createElement('div');
-    row.className = 'd-flex flex-wrap gap-2 align-items-center mb-2 mod-ing-line';
-    var uid = mid || (mats[0] && mats[0].id);
-    var unit = u || '';
-    if (!unit && uid) {
-      var found = mats.find(function (x) { return x.id === Number(uid); });
-      unit = (found && found.unit) || '';
-    }
-    row.innerHTML =
-      '<select class="form-select form-select-sm rounded-3 mod-ing-m" style="min-width:11rem">' +
-        (mats.length ? matOptions(uid) : '<option value="">No materials</option>') +
-      '</select>' +
-      '<input type="number" step="0.001" min="0" class="form-control form-control-sm text-end rounded-3 mod-ing-q" style="width:6.5rem" placeholder="Qty" value="' + escAttr(q == null || q === '' ? '' : q) + '">' +
-      '<input class="form-control form-control-sm rounded-3 mod-ing-u" style="width:5.5rem" placeholder="Unit" value="' + escAttr(unit) + '">' +
-      '<label class="small text-secondary mb-0 text-nowrap">Replaces base ingredient (optional)</label>' +
-      '<select class="form-select form-select-sm rounded-3 mod-ing-sub" style="min-width:12rem">' +
-        baseRecipeOptions(substitutesId) +
-      '</select>' +
-      '<button type="button" class="btn btn-sm btn-outline-danger border-0 mod-ing-del" aria-label="Remove ingredient"><i class="material-icons-outlined" style="font-size:18px">close</i></button>';
-    container.appendChild(row);
-  }
-
-  function setIngOpen(mainTr, open) {
-    var next = mainTr.nextElementSibling;
-    if (!next || !next.classList.contains('mod-ings')) return;
-    next.classList.toggle('d-none', !open);
-    var btn = mainTr.querySelector('.mod-link-ing');
-    if (btn) btn.textContent = open ? 'Hide ingredients' : '+ Link ingredient';
-  }
-
-  function addModRow(g, o, price, recipeLines) {
+  function addModRow(g, o, price) {
     var tbody = document.getElementById('modRows');
-    var lines = recipeLines || [];
-    var hasIng = lines.length > 0;
     var tr = document.createElement('tr');
     tr.className = 'mod-main';
     tr.innerHTML =
       '<td><input class="form-control form-control-sm rounded-3 mod-g" value="' + escAttr(g || '') + '"></td>' +
       '<td><input class="form-control form-control-sm rounded-3 mod-o" value="' + escAttr(o || '') + '"></td>' +
       '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 mod-p" value="' + escAttr(price || 0) + '"></td>' +
-      '<td class="text-nowrap">' +
-        '<button type="button" class="btn btn-sm btn-link px-0 me-2 mod-link-ing">' + (hasIng ? 'Hide ingredients' : '+ Link ingredient') + '</button>' +
-        rowDelBtn('mod-del') +
-      '</td>';
-    var tr2 = document.createElement('tr');
-    tr2.className = 'mod-ings' + (hasIng ? '' : ' d-none');
-    tr2.innerHTML =
-      '<td colspan="4" class="pt-0">' +
-        '<div class="small text-secondary mb-2">Ingredient consumed when this option is selected. Leave “Replaces” as None to add extra stock use; pick a base-recipe ingredient to use this material instead of that one.</div>' +
-        '<div class="mod-ing-lines"></div>' +
-        '<button type="button" class="btn btn-sm btn-outline-secondary rounded-3 mod-ing-add">Add ingredient</button>' +
-      '</td>';
+      '<td class="text-nowrap">' + rowDelBtn('mod-del') + '</td>';
     tbody.appendChild(tr);
-    tbody.appendChild(tr2);
-    var box = tr2.querySelector('.mod-ing-lines');
-    lines.forEach(function (r) {
-      addIngLine(box, r.raw_material_id, r.quantity_used, r.unit, r.substitutes_raw_material_id);
-    });
   }
 
   function getProductId() {
-    var v = parseInt(String(document.getElementById('prodId').value || ''), 10);
-    return v;
+    return parseInt(String(document.getElementById('prodId').value || ''), 10);
   }
 
   function formatApiError(data) {
@@ -223,6 +127,18 @@
       }).join(' ');
     }
     return String(d);
+  }
+
+  function collectMods() {
+    var out = [];
+    document.querySelectorAll('#modRows tr.mod-main').forEach(function (tr) {
+      var g = tr.querySelector('.mod-g').value.trim();
+      var o = tr.querySelector('.mod-o').value.trim();
+      var p = tr.querySelector('.mod-p').value || '0';
+      if (!g || !o) return;
+      out.push({ group_name: g, option_name: o, extra_price: String(p) });
+    });
+    return out;
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
@@ -294,9 +210,8 @@
 
     document.getElementById('prodImageFile').addEventListener('change', function () {
       var f = this.files[0];
-      if (f) {
-        showPickedFilePreview(f);
-      } else {
+      if (f) showPickedFilePreview(f);
+      else {
         revokePickPreview();
         refreshImagePreview(false);
       }
@@ -311,9 +226,7 @@
         PodCafe.toast('Choose an image file first.', 'warning');
         return;
       }
-      if (!Number.isFinite(id) || id <= 0) {
-        return;
-      }
+      if (!Number.isFinite(id) || id <= 0) return;
       btn.disabled = true;
       var prevText = btn.textContent;
       btn.textContent = 'Uploading…';
@@ -332,8 +245,7 @@
           return;
         }
         if (!data.image_url) {
-          var bad = 'Upload succeeded but the server did not return an image URL.';
-          PodCafe.toast(bad, 'danger');
+          PodCafe.toast('Upload succeeded but the server did not return an image URL.', 'danger');
           return;
         }
         revokePickPreview();
@@ -341,8 +253,7 @@
         document.getElementById('prodImageFile').value = '';
         refreshImagePreview(true);
       } catch (err) {
-        var em = (err && err.message) ? err.message : String(err);
-        PodCafe.toast('Upload failed: ' + em, 'danger');
+        PodCafe.toast('Upload failed: ' + ((err && err.message) ? err.message : String(err)), 'danger');
       } finally {
         btn.textContent = prevText;
         syncImageUi();
@@ -379,55 +290,37 @@
     document.getElementById('prodCrumb').textContent = isNew ? 'New' : 'Edit #' + getProductId();
 
     try {
-    var rc = await PodCafe.apiFetch('/api/v1/categories');
-    if (!rc.ok) throw new Error('categories HTTP ' + rc.status);
-    var cats = await rc.json();
-    cats.forEach(function (c) {
-      var o = document.createElement('option');
-      o.value = String(c.id);
-      o.textContent = c.name;
-      sel.appendChild(o);
-    });
+      var rc = await PodCafe.apiFetch('/api/v1/categories');
+      if (!rc.ok) throw new Error('categories HTTP ' + rc.status);
+      var cats = await rc.json();
+      cats.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = String(c.id);
+        o.textContent = c.name;
+        sel.appendChild(o);
+      });
 
-    var rm = await PodCafe.apiFetch('/api/v1/raw-materials');
-    if (!rm.ok) throw new Error('raw-materials HTTP ' + rm.status);
-    mats = await rm.json();
-
-    if (!isNew) {
-      var rp = await PodCafe.apiFetch('/api/v1/products/' + getProductId());
-      if (!rp.ok) throw new Error('product HTTP ' + rp.status);
-      var pr = await rp.json();
-      sel.value = String(pr.category_id);
-      document.getElementById('prodName').value = pr.name;
-      document.getElementById('prodNameAr').value = pr.name_ar || '';
-      document.getElementById('prodPrice').value = pr.price;
-      document.getElementById('prodDesc').value = pr.description || '';
-      document.getElementById('prodSort').value = pr.sort_order;
-      document.getElementById('prodActive').checked = !!pr.is_active;
-      var incomingImg = pr.image_url || '';
-      var curImg = document.getElementById('prodStoredImageUrl').value.trim();
-      // Avoid wiping an in-session upload: GET can finish after POST or return a stale body.
-      if (!(curImg && !incomingImg)) {
-        document.getElementById('prodStoredImageUrl').value = incomingImg;
+      if (!isNew) {
+        var rp = await PodCafe.apiFetch('/api/v1/products/' + getProductId());
+        if (!rp.ok) throw new Error('product HTTP ' + rp.status);
+        var pr = await rp.json();
+        sel.value = String(pr.category_id);
+        document.getElementById('prodName').value = pr.name;
+        document.getElementById('prodNameAr').value = pr.name_ar || '';
+        document.getElementById('prodPrice').value = pr.price;
+        document.getElementById('prodDesc').value = pr.description || '';
+        document.getElementById('prodSort').value = pr.sort_order;
+        document.getElementById('prodActive').checked = !!pr.is_active;
+        var incomingImg = pr.image_url || '';
+        var curImg = document.getElementById('prodStoredImageUrl').value.trim();
+        if (!(curImg && !incomingImg)) {
+          document.getElementById('prodStoredImageUrl').value = incomingImg;
+        }
+        refreshImagePreview(false);
+        (pr.modifiers || []).forEach(function (m) {
+          addModRow(m.group_name, m.option_name, m.extra_price);
+        });
       }
-      refreshImagePreview(false);
-      var recB = document.getElementById('recRows');
-      (pr.recipe || []).forEach(function (r) {
-        var tr = document.createElement('tr');
-        var opts = mats.map(function (x) {
-          return '<option value="' + x.id + '"' + (x.id === r.raw_material_id ? ' selected' : '') + '>' + x.name + '</option>';
-        }).join('');
-        tr.innerHTML =
-          '<td><select class="form-select form-select-sm rounded-3 rec-m">' + opts + '</select></td>' +
-          '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 rec-q" value="' + r.quantity_used + '"></td>' +
-          '<td><input class="form-control form-control-sm rounded-3 rec-u" value="' + String(r.unit).replace(/"/g, '&quot;') + '"></td>' +
-          '<td>' + rowDelBtn('rec-del') + '</td>';
-        recB.appendChild(tr);
-      });
-      (pr.modifiers || []).forEach(function (m) {
-        addModRow(m.group_name, m.option_name, m.extra_price, m.recipe || []);
-      });
-    }
     } catch (e) {
       var errBox = document.getElementById('prodErr');
       if (errBox) {
@@ -438,82 +331,17 @@
 
     syncImageUi();
 
-    function addRecRow(mid, q, u) {
-      var recB = document.getElementById('recRows');
-      if (!mats.length) return;
-      var tr = document.createElement('tr');
-      mid = mid || (mats[0] && mats[0].id);
-      var opts = mats.map(function (x) {
-        return '<option value="' + x.id + '"' + (mid && Number(mid) === x.id ? ' selected' : '') + '>' + x.name + '</option>';
-      }).join('');
-      tr.innerHTML =
-        '<td><select class="form-select form-select-sm rounded-3 rec-m">' + opts + '</select></td>' +
-        '<td class="text-end"><input type="number" step="0.001" class="form-control form-control-sm text-end rounded-3 rec-q" value="' + (q || 0) + '"></td>' +
-        '<td><input class="form-control form-control-sm rounded-3 rec-u" value="' + String(u || (mats[0] && mats[0].unit) || '').replace(/"/g, '&quot;') + '"></td>' +
-        '<td>' + rowDelBtn('rec-del') + '</td>';
-      recB.appendChild(tr);
-    }
-
-    document.getElementById('modAddRow').addEventListener('click', function () { addModRow('Size', 'Large', 0.100); });
-    document.getElementById('recAddRow').addEventListener('click', function () {
-      addRecRow(mats[0] && mats[0].id, 1, mats[0] && mats[0].unit);
-      refreshSubDropdowns();
+    document.getElementById('modAddRow').addEventListener('click', function () {
+      addModRow('Milk', 'Hazelnut', 0.300);
     });
-
     document.getElementById('modRows').addEventListener('click', function (e) {
       var del = e.target.closest('.mod-del');
       if (del) {
         var main = del.closest('tr.mod-main');
-        if (main) {
-          var next = main.nextElementSibling;
-          if (next && next.classList.contains('mod-ings')) next.remove();
-          main.remove();
-        }
-        return;
+        if (main) main.remove();
       }
-      var link = e.target.closest('.mod-link-ing');
-      if (link) {
-        var main = link.closest('tr.mod-main');
-        var next = main && main.nextElementSibling;
-        var opening = next && next.classList.contains('d-none');
-        setIngOpen(main, opening);
-        if (opening && next) {
-          var box = next.querySelector('.mod-ing-lines');
-          if (box && !box.querySelector('.mod-ing-line') && mats.length) addIngLine(box);
-        }
-        return;
-      }
-      if (e.target.closest('.mod-ing-del')) {
-        var line = e.target.closest('.mod-ing-line');
-        if (line) line.remove();
-        return;
-      }
-      if (e.target.closest('.mod-ing-add')) {
-        var wrap = e.target.closest('tr.mod-ings');
-        var box = wrap && wrap.querySelector('.mod-ing-lines');
-        if (!box) return;
-        if (mats.length) addIngLine(box);
-        else PodCafe.toast('Add a raw material first.', 'warning');
-      }
-    });
-    document.getElementById('modRows').addEventListener('change', function (e) {
-      if (!e.target.classList.contains('mod-ing-m')) return;
-      var id = Number(e.target.value);
-      var found = mats.find(function (x) { return x.id === id; });
-      var unitInput = e.target.closest('.mod-ing-line').querySelector('.mod-ing-u');
-      if (found && unitInput && !unitInput.value.trim()) unitInput.value = found.unit;
-    });
-    document.getElementById('recRows').addEventListener('click', function (e) {
-      if (e.target.closest('.rec-del')) {
-        e.target.closest('tr').remove();
-        refreshSubDropdowns();
-      }
-    });
-    document.getElementById('recRows').addEventListener('change', function (e) {
-      if (e.target.classList.contains('rec-m')) refreshSubDropdowns();
     });
 
-    /** If user chose a file but did not click "Upload photo", upload it before save. */
     async function uploadPendingPhotoIfAny(productId) {
       var fileInput = document.getElementById('prodImageFile');
       var f = fileInput.files && fileInput.files[0];
@@ -597,36 +425,6 @@
       }
     });
 
-    function collectMods() {
-      var out = [];
-      document.querySelectorAll('#modRows tr.mod-main').forEach(function (tr) {
-        var g = tr.querySelector('.mod-g').value.trim();
-        var o = tr.querySelector('.mod-o').value.trim();
-        var p = tr.querySelector('.mod-p').value || '0';
-        if (!g || !o) return;
-        var recipe = [];
-        var next = tr.nextElementSibling;
-        if (next && next.classList.contains('mod-ings')) {
-          next.querySelectorAll('.mod-ing-line').forEach(function (row) {
-            var mid = Number(row.querySelector('.mod-ing-m').value);
-            var q = row.querySelector('.mod-ing-q').value;
-            var u = row.querySelector('.mod-ing-u').value.trim();
-            if (!mid || !u || !q || Number(q) <= 0) return;
-            var subEl = row.querySelector('.mod-ing-sub');
-            var subId = subEl && subEl.value ? Number(subEl.value) : null;
-            recipe.push({
-              raw_material_id: mid,
-              quantity_used: String(q),
-              unit: u,
-              substitutes_raw_material_id: subId || null
-            });
-          });
-        }
-        out.push({ group_name: g, option_name: o, extra_price: String(p), recipe: recipe });
-      });
-      return out;
-    }
-
     document.getElementById('modSaveBtn').addEventListener('click', async function () {
       if (isNew) { PodCafe.toast('Save product details first.', 'warning'); return; }
       var res = await PodCafe.apiFetch('/api/v1/products/' + getProductId(), {
@@ -635,24 +433,6 @@
       });
       if (!res.ok) { PodCafe.toast('Could not save modifiers', 'danger'); return; }
       PodCafe.toast('Modifiers saved.', 'success');
-    });
-
-    document.getElementById('recSaveBtn').addEventListener('click', async function () {
-      if (isNew) { PodCafe.toast('Save product details first.', 'warning'); return; }
-      var lines = [];
-      document.querySelectorAll('#recRows tr').forEach(function (tr) {
-        lines.push({
-          raw_material_id: Number(tr.querySelector('.rec-m').value),
-          quantity_used: String(tr.querySelector('.rec-q').value || '0'),
-          unit: tr.querySelector('.rec-u').value.trim()
-        });
-      });
-      var res = await PodCafe.apiFetch('/api/v1/products/' + getProductId() + '/recipe', {
-        method: 'POST',
-        body: JSON.stringify({ lines: lines })
-      });
-      if (!res.ok) { PodCafe.toast('Could not save recipe', 'danger'); return; }
-      PodCafe.toast('Recipe saved.', 'success');
     });
   });
 })();

@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.models.inventory_movement import InventoryMovement
     from app.models.order_item import OrderItem
     from app.models.user import User
 
@@ -44,7 +43,4 @@ class Order(Base):
     user: Mapped["User"] = relationship("User", back_populates="orders")
     items: Mapped[list["OrderItem"]] = relationship(
         "OrderItem", back_populates="order", cascade="all, delete-orphan"
-    )
-    inventory_movements: Mapped[list["InventoryMovement"]] = relationship(
-        "InventoryMovement", back_populates="order"
     )

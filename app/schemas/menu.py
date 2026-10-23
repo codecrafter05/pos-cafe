@@ -30,33 +30,10 @@ class CategoryOut(CategoryBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class RecipeLineIn(BaseModel):
-    raw_material_id: int
-    quantity_used: Decimal
-    unit: str
-
-
-class RecipeLineOut(RecipeLineIn):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ModifierRecipeLineIn(RecipeLineIn):
-    substitutes_raw_material_id: int | None = None
-
-
-class ModifierRecipeLineOut(ModifierRecipeLineIn):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class ModifierIn(BaseModel):
     group_name: str = Field(..., max_length=100)
     option_name: str = Field(..., max_length=100)
     extra_price: Decimal = Decimal("0")
-    recipe: list[ModifierRecipeLineIn] = []
 
 
 class ModifierOut(BaseModel):
@@ -64,33 +41,6 @@ class ModifierOut(BaseModel):
     group_name: str
     option_name: str
     extra_price: Decimal = Decimal("0")
-    recipe: list[ModifierRecipeLineOut] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class RawMaterialBase(BaseModel):
-    name: str
-    unit: str
-    current_stock: Decimal = Decimal("0")
-    min_stock_alert: Decimal = Decimal("0")
-    cost_per_unit: Decimal = Decimal("0")
-
-
-class RawMaterialCreate(RawMaterialBase):
-    pass
-
-
-class RawMaterialUpdate(BaseModel):
-    name: str | None = None
-    unit: str | None = None
-    min_stock_alert: Decimal | None = None
-    cost_per_unit: Decimal | None = None
-
-
-class RawMaterialOut(RawMaterialBase):
-    id: int
-    created_at: UtcDateTime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -124,18 +74,7 @@ class ProductUpdate(BaseModel):
 
 class ProductOut(ProductBase):
     id: int
-    cost_price: Decimal
     created_at: UtcDateTime
     modifiers: list[ModifierOut] = []
-    recipe: list[RecipeLineOut] = []
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class RecipeReplaceRequest(BaseModel):
-    lines: list[RecipeLineIn]
-
-
-class ManualStockAdjustRequest(BaseModel):
-    quantity_delta: Decimal
-    notes: str | None = None

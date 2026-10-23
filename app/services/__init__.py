@@ -1,1 +1,1 @@
-# Business logic services (inventory, orders, etc.)
+# Business logic services (orders, sync, dashboard, etc.)

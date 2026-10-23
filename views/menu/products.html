@@ -18,7 +18,6 @@
             <th>Product</th>
             <th>Category</th>
             <th class="text-end">Price</th>
-            <th class="text-end">Cost</th>
             <th>Active</th>
             <th class="text-end">Actions</th>
           </tr>
@@ -93,14 +92,10 @@
       products.forEach(function (r) {
         var tr = document.createElement('tr');
         tr.innerHTML =
-          '<td><div class="fw-semibold">' + esc(r.name) +
-          ((r.recipe && r.recipe.length) ? '' :
-            ' <span class="badge bg-warning bg-opacity-10 text-warning rounded-pill">No recipe</span>') +
-          '</div>' +
+          '<td><div class="fw-semibold">' + esc(r.name) + '</div>' +
           '<div class="text-secondary small">' + esc(r.name_ar || '') + '</div></td>' +
           '<td class="text-secondary">' + esc(cmap[r.category_id] || '') + '</td>' +
           '<td class="text-end fw-semibold">' + PodCafe.currency(r.price) + '</td>' +
-          '<td class="text-end text-secondary">' + PodCafe.currency(r.cost_price) + '</td>' +
           '<td>' + (r.is_active ? '<span class="badge bg-success bg-opacity-10 text-success rounded-pill">Yes</span>' :
             '<span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill">No</span>') + '</td>' +
           '<td class="text-end">' +

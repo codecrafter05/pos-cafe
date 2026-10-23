@@ -1,5 +1,4 @@
 import uuid
-from decimal import Decimal
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -8,33 +7,25 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.core.paths import PRODUCT_UPLOAD_DIR
-from app.models.modifier_recipe import ModifierRecipe
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.product_modifier import ProductModifier
-from app.models.product_recipe import ProductRecipe
 from app.models.user import User
 from app.schemas.menu import (
     ModifierOut,
-    ModifierRecipeLineOut,
     ProductCreate,
     ProductOut,
     ProductUpdate,
-    RecipeLineOut,
-    RecipeReplaceRequest,
 )
-from app.services.order_service import recompute_product_cost_price
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 _ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 _MAX_IMAGE_BYTES = 3 * 1024 * 1024
-# Reject empty / test payloads that are not decodable in browsers
 _MIN_IMAGE_BYTES = 32
 
 _staff = require_roles("owner", "manager", "cashier")
-_WRITERS = require_roles("owner", "manager")
-_writers = _WRITERS
+_writers = require_roles("owner", "manager")
 
 
 def _safe_remove_uploaded_file(image_url: str | None) -> None:
@@ -61,7 +52,6 @@ def _modifier_out(m: ProductModifier) -> ModifierOut:
         group_name=m.group_name,
         option_name=m.option_name,
         extra_price=m.extra_price,
-        recipe=[ModifierRecipeLineOut.model_validate(r) for r in m.recipe_lines],
     )
 
 
@@ -72,56 +62,32 @@ def _to_out(p: Product) -> ProductOut:
         name=p.name,
         name_ar=p.name_ar,
         price=p.price,
-        cost_price=p.cost_price,
         description=p.description,
         image_url=p.image_url,
         is_active=p.is_active,
         sort_order=p.sort_order,
         created_at=p.created_at,
         modifiers=[_modifier_out(m) for m in p.modifiers],
-        recipe=[RecipeLineOut.model_validate(r) for r in p.recipe_lines],
     )
-
-
-def _modifier_load_options():
-    return joinedload(Product.modifiers).joinedload(ProductModifier.recipe_lines)
 
 
 def _persist_modifiers(db: Session, product_id: int, mods) -> None:
     for m in mods:
         data = m.model_dump() if hasattr(m, "model_dump") else dict(m)
-        recipe = data.pop("recipe", None) or []
-        mod = ProductModifier(
-            product_id=product_id,
-            group_name=data["group_name"],
-            option_name=data["option_name"],
-            extra_price=data["extra_price"],
-        )
-        db.add(mod)
-        db.flush()
-        for line in recipe:
-            ld = line.model_dump() if hasattr(line, "model_dump") else dict(line)
-            qty = Decimal(str(ld.get("quantity_used") or 0))
-            unit = str(ld.get("unit") or "").strip()
-            raw_id = ld.get("raw_material_id")
-            if not raw_id or qty <= 0 or not unit:
-                continue
-            sub_id = ld.get("substitutes_raw_material_id")
-            db.add(
-                ModifierRecipe(
-                    modifier_id=mod.id,
-                    raw_material_id=int(raw_id),
-                    quantity_used=qty,
-                    unit=unit,
-                    substitutes_raw_material_id=int(sub_id) if sub_id else None,
-                )
+        db.add(
+            ProductModifier(
+                product_id=product_id,
+                group_name=data["group_name"],
+                option_name=data["option_name"],
+                extra_price=data["extra_price"],
             )
+        )
 
 
 def _load_product(db: Session, product_id: int) -> Product:
     p = (
         db.query(Product)
-        .options(_modifier_load_options(), joinedload(Product.recipe_lines))
+        .options(joinedload(Product.modifiers))
         .filter(Product.id == product_id)
         .first()
     )
@@ -137,10 +103,7 @@ def list_products(
     db: Session = Depends(get_db),
     _: User = Depends(_staff),
 ):
-    q = db.query(Product).options(
-        _modifier_load_options(),
-        joinedload(Product.recipe_lines),
-    )
+    q = db.query(Product).options(joinedload(Product.modifiers))
     if category_id is not None:
         q = q.filter(Product.category_id == category_id)
     if active_only:
@@ -155,8 +118,7 @@ def get_product(
     db: Session = Depends(get_db),
     _: User = Depends(_staff),
 ):
-    p = _load_product(db, product_id)
-    return _to_out(p)
+    return _to_out(_load_product(db, product_id))
 
 
 @router.post("", response_model=ProductOut)
@@ -170,11 +132,8 @@ def create_product(
     db.add(p)
     db.flush()
     _persist_modifiers(db, p.id, body.modifiers)
-    db.flush()
-    recompute_product_cost_price(db, p.id)
     db.commit()
-    p = _load_product(db, p.id)
-    return _to_out(p)
+    return _to_out(_load_product(db, p.id))
 
 
 @router.post("/{product_id}/image", response_model=ProductOut)
@@ -217,8 +176,7 @@ async def upload_product_image(
         ) from exc
     p.image_url = f"/static/uploads/products/{fname}"
     db.commit()
-    p = _load_product(db, product_id)
-    return _to_out(p)
+    return _to_out(_load_product(db, product_id))
 
 
 @router.delete("/{product_id}/image", response_model=ProductOut)
@@ -233,8 +191,7 @@ def delete_product_image(
     _safe_remove_uploaded_file(p.image_url)
     p.image_url = None
     db.commit()
-    p = _load_product(db, product_id)
-    return _to_out(p)
+    return _to_out(_load_product(db, product_id))
 
 
 @router.put("/{product_id}", response_model=ProductOut)
@@ -256,31 +213,8 @@ def update_product(
             synchronize_session=False
         )
         _persist_modifiers(db, p.id, mods)
-    db.flush()
-    recompute_product_cost_price(db, p.id)
     db.commit()
-    p = _load_product(db, product_id)
-    return _to_out(p)
-
-
-@router.post("/{product_id}/recipe", response_model=ProductOut)
-def replace_recipe(
-    product_id: int,
-    body: RecipeReplaceRequest,
-    db: Session = Depends(get_db),
-    _: User = Depends(_writers),
-):
-    p = db.get(Product, product_id)
-    if p is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    db.query(ProductRecipe).filter(ProductRecipe.product_id == p.id).delete(synchronize_session=False)
-    for line in body.lines:
-        db.add(ProductRecipe(product_id=p.id, **line.model_dump()))
-    db.flush()
-    recompute_product_cost_price(db, p.id)
-    db.commit()
-    p = _load_product(db, product_id)
-    return _to_out(p)
+    return _to_out(_load_product(db, product_id))
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -299,7 +233,6 @@ def delete_product(
         return None
     _safe_remove_uploaded_file(p.image_url)
     db.query(ProductModifier).filter(ProductModifier.product_id == p.id).delete(synchronize_session=False)
-    db.query(ProductRecipe).filter(ProductRecipe.product_id == p.id).delete(synchronize_session=False)
     db.delete(p)
     db.commit()
     return None

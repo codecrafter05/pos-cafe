@@ -1,13 +1,8 @@
 from app.models.category import Category
-from app.models.inventory_movement import InventoryMovement
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.models.modifier_recipe import ModifierRecipe
 from app.models.product_modifier import ProductModifier
-from app.models.product_recipe import ProductRecipe
-from app.models.purchase import Purchase
-from app.models.raw_material import RawMaterial
 from app.models.refresh_token import RefreshToken
 from app.models.shop_settings import ShopSettings
 from app.models.sync_rejection import SyncRejection
@@ -15,15 +10,10 @@ from app.models.user import User
 
 __all__ = [
     "Category",
-    "InventoryMovement",
-    "ModifierRecipe",
     "Order",
     "OrderItem",
     "Product",
     "ProductModifier",
-    "ProductRecipe",
-    "Purchase",
-    "RawMaterial",
     "RefreshToken",
     "ShopSettings",
     "SyncRejection",

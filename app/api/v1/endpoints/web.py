@@ -57,11 +57,6 @@ def menu_product_detail_page(request: Request, product_id: int):
     return render_protected(request, "menu/product_detail.html", {"product_id": product_id})
 
 
-@router.get("/menu/inventory", response_class=HTMLResponse, include_in_schema=False)
-def menu_inventory_page(request: Request):
-    return render_protected(request, "menu/inventory.html")
-
-
 @router.get("/orders/history", response_class=HTMLResponse, include_in_schema=False)
 def orders_history_page(request: Request):
     return render_protected(request, "orders/history.html")
@@ -75,11 +70,6 @@ def sync_issues_page(request: Request):
 @router.get("/orders/{order_id}/receipt", response_class=HTMLResponse, include_in_schema=False)
 def order_receipt_page(request: Request, order_id: int):
     return render_protected(request, "orders/receipt.html", {"order_id": order_id})
-
-
-@router.get("/inventory/purchases", response_class=HTMLResponse, include_in_schema=False)
-def inventory_purchases_page(request: Request):
-    return render_protected(request, "inventory/purchases.html")
 
 
 @router.get("/users", response_class=HTMLResponse, include_in_schema=False)

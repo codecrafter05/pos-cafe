@@ -10,7 +10,6 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.product_modifier import ProductModifier
-    from app.models.product_recipe import ProductRecipe
 
 
 class Product(Base):
@@ -33,7 +32,4 @@ class Product(Base):
     category: Mapped["Category"] = relationship("Category", back_populates="products")
     modifiers: Mapped[list["ProductModifier"]] = relationship(
         "ProductModifier", back_populates="product", cascade="all, delete-orphan"
-    )
-    recipe_lines: Mapped[list["ProductRecipe"]] = relationship(
-        "ProductRecipe", back_populates="product", cascade="all, delete-orphan"
     )

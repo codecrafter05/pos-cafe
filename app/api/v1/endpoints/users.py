@@ -5,7 +5,6 @@ from app.api.deps import require_roles
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.order import Order
-from app.models.purchase import Purchase
 from app.models.user import User
 from app.schemas.auth import DeviceSessionOut
 from app.schemas.dashboard import UserAdminCreate, UserAdminUpdate, UserListOut
@@ -89,11 +88,6 @@ def delete_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete a user who has orders. Deactivate instead.",
-        )
-    if db.query(Purchase).filter(Purchase.user_id == user_id).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete a user linked to purchase records.",
         )
     db.delete(user)
     db.commit()
