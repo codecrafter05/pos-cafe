@@ -15,7 +15,6 @@ from app.core.time import (
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
-from app.models.raw_material import RawMaterial
 
 Period = Literal["today", "week", "month"]
 
@@ -23,17 +22,13 @@ Period = Literal["today", "week", "month"]
 @dataclass(frozen=True)
 class SummaryRow:
     revenue: Decimal
-    net_profit: Decimal
     orders_count: int
     avg_order_value: Decimal
-    total_cost: Decimal = Decimal("0")
 
 
 def _summary_between(db: Session, start: datetime, end: datetime) -> SummaryRow:
     q = db.query(
         func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
-        func.coalesce(func.sum(Order.total_cost), 0).label("total_cost"),
-        func.coalesce(func.sum(Order.profit), 0).label("net_profit"),
         func.count().label("orders_count"),
         func.coalesce(func.avg(Order.total_amount), 0).label("avg_order_value"),
     ).filter(
@@ -44,8 +39,6 @@ def _summary_between(db: Session, start: datetime, end: datetime) -> SummaryRow:
     row = q.one()
     return SummaryRow(
         revenue=Decimal(str(row.revenue or 0)),
-        total_cost=Decimal(str(row.total_cost or 0)),
-        net_profit=Decimal(str(row.net_profit or 0)),
         orders_count=int(row.orders_count or 0),
         avg_order_value=Decimal(str(row.avg_order_value or 0)),
     )
@@ -59,7 +52,7 @@ def dashboard_summary(db: Session, *, date_from: date, date_to: date) -> Summary
 def sales_chart_for_dates(db: Session, *, date_from: date, date_to: date) -> list[dict]:
     start, end = bahrain_range_utc(date_from, date_to)
     rows = (
-        db.query(Order.created_at, Order.total_amount, Order.total_cost, Order.profit)
+        db.query(Order.created_at, Order.total_amount)
         .filter(
             Order.created_at >= start,
             Order.created_at < end,
@@ -70,14 +63,9 @@ def sales_chart_for_dates(db: Session, *, date_from: date, date_to: date) -> lis
     by_date: dict[date, dict[str, Decimal | int]] = {}
     d = date_from
     while d <= date_to:
-        by_date[d] = {
-            "revenue": Decimal("0"),
-            "cost": Decimal("0"),
-            "profit": Decimal("0"),
-            "orders": 0,
-        }
+        by_date[d] = {"revenue": Decimal("0"), "orders": 0}
         d += timedelta(days=1)
-    for created_at, amount, cost, profit in rows:
+    for created_at, amount in rows:
         if created_at is None:
             continue
         dk = as_bahrain(created_at).date()
@@ -85,8 +73,6 @@ def sales_chart_for_dates(db: Session, *, date_from: date, date_to: date) -> lis
         if bucket is None:
             continue
         bucket["revenue"] += Decimal(str(amount or 0))
-        bucket["cost"] += Decimal(str(cost or 0))
-        bucket["profit"] += Decimal(str(profit or 0))
         bucket["orders"] = int(bucket["orders"]) + 1
     out: list[dict] = []
     d = date_from
@@ -97,8 +83,6 @@ def sales_chart_for_dates(db: Session, *, date_from: date, date_to: date) -> lis
                 "date": d.isoformat(),
                 "label": d.strftime("%a %d/%m"),
                 "revenue": b["revenue"],
-                "cost": b["cost"],
-                "profit": b["profit"],
                 "orders": int(b["orders"]),
             }
         )
@@ -131,10 +115,6 @@ def _products_between(
                 func.sum(OrderItem.unit_price * OrderItem.quantity),
                 0,
             ).label("revenue"),
-            func.coalesce(
-                func.sum(OrderItem.unit_cost * OrderItem.quantity),
-                0,
-            ).label("cost"),
         )
         .join(Order, Order.id == OrderItem.order_id)
         .filter(
@@ -147,7 +127,7 @@ def _products_between(
         .subquery()
     )
     q = (
-        db.query(Product, sub.c.units_sold, sub.c.revenue, sub.c.cost)
+        db.query(Product, sub.c.units_sold, sub.c.revenue)
         .join(sub, Product.id == sub.c.product_id)
         .order_by(sub.c.revenue.desc())
     )
@@ -155,18 +135,14 @@ def _products_between(
         q = q.limit(max(1, min(limit, 50)))
     rows = q.all()
     out: list[dict] = []
-    for p, units, revenue, cost in rows:
-        rev = Decimal(str(revenue or 0))
-        cst = Decimal(str(cost or 0))
+    for p, units, revenue in rows:
         out.append(
             {
                 "product_id": p.id,
                 "name": p.name,
                 "name_ar": p.name_ar,
                 "units_sold": int(units or 0),
-                "revenue": rev,
-                "cost": cst,
-                "profit": rev - cst,
+                "revenue": Decimal(str(revenue or 0)),
             }
         )
     return out
@@ -204,41 +180,13 @@ def peak_hours(db: Session, *, date_from: date, date_to: date) -> list[dict]:
     return [{"hour": h, "orders": counts.get(h, 0)} for h in range(24)]
 
 
-def inventory_alerts(db: Session) -> list[RawMaterial]:
-    return (
-        db.query(RawMaterial)
-        .filter(RawMaterial.current_stock <= RawMaterial.min_stock_alert)
-        .order_by(RawMaterial.name)
-        .all()
-    )
-
-
-def negative_stock_materials(db: Session) -> list[RawMaterial]:
-    """Materials sold past their recorded stock, worst shortfall first.
-
-    Sales never block on stock, so a negative balance is the owner's signal that
-    either a purchase went unrecorded or the recipe/waste needs attention.
-    """
-    return (
-        db.query(RawMaterial)
-        .filter(RawMaterial.current_stock < 0)
-        .order_by(RawMaterial.current_stock.asc(), RawMaterial.name)
-        .all()
-    )
-
-
 def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]:
-    """Revenue split by how the customer paid, biggest earner first.
-
-    When the range has any sales, every in-person method is listed — including
-    Card — so a method with no takings still appears at zero.
-    """
+    """Revenue split by how the customer paid, biggest earner first."""
     rows = (
         db.query(
             Order.payment_method.label("payment_method"),
             func.count().label("orders"),
             func.coalesce(func.sum(Order.total_amount), 0).label("revenue"),
-            func.coalesce(func.sum(Order.profit), 0).label("profit"),
         )
         .filter(
             Order.created_at >= start,
@@ -254,7 +202,6 @@ def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]
             "label": payment_label(row.payment_method),
             "orders": int(row.orders or 0),
             "revenue": Decimal(str(row.revenue or 0)),
-            "profit": Decimal(str(row.profit or 0)),
         }
         for row in rows
     ]
@@ -268,7 +215,6 @@ def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]
                         "label": payment_label(method),
                         "orders": 0,
                         "revenue": Decimal("0"),
-                        "profit": Decimal("0"),
                     }
                 )
     rank = {method: index for index, method in enumerate(IN_PERSON_PAYMENT_METHODS)}
@@ -277,14 +223,13 @@ def _payments_between(db: Session, start: datetime, end: datetime) -> list[dict]
 
 
 def waste_summary(db: Session, *, date_from: date, date_to: date) -> dict:
-    """Wasted lines in the range: prepared but not sold (inventory not restocked)."""
+    """Wasted lines in the range: prepared but not sold."""
     start, end = bahrain_range_utc(date_from, date_to)
     rows = (
         db.query(
             OrderItem.product_id.label("product_id"),
             func.sum(OrderItem.quantity).label("units"),
             func.coalesce(func.sum(OrderItem.unit_price * OrderItem.quantity), 0).label("retail"),
-            func.coalesce(func.sum(OrderItem.unit_cost * OrderItem.quantity), 0).label("cost"),
         )
         .join(Order, Order.id == OrderItem.order_id)
         .filter(
@@ -296,21 +241,18 @@ def waste_summary(db: Session, *, date_from: date, date_to: date) -> dict:
         .subquery()
     )
     q = (
-        db.query(Product, rows.c.units, rows.c.retail, rows.c.cost)
+        db.query(Product, rows.c.units, rows.c.retail)
         .join(rows, Product.id == rows.c.product_id)
-        .order_by(rows.c.cost.desc())
+        .order_by(rows.c.retail.desc())
     )
     products = []
     items_count = 0
     lost_retail = Decimal("0")
-    lost_cost = Decimal("0")
-    for p, units, retail, cost in q.all():
+    for p, units, retail in q.all():
         qty = int(units or 0)
         rev = Decimal(str(retail or 0))
-        cst = Decimal(str(cost or 0))
         items_count += qty
         lost_retail += rev
-        lost_cost += cst
         products.append(
             {
                 "product_id": p.id,
@@ -318,14 +260,12 @@ def waste_summary(db: Session, *, date_from: date, date_to: date) -> dict:
                 "name_ar": p.name_ar,
                 "units": qty,
                 "lost_retail": rev,
-                "lost_cost": cst,
             }
         )
     return {
         "items_count": items_count,
         "products_count": len(products),
         "lost_retail": lost_retail,
-        "lost_cost": lost_cost,
         "products": products,
     }
 
@@ -340,8 +280,6 @@ def report_for_range(db: Session, *, date_from: date, date_to: date) -> dict:
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "revenue": summary.revenue,
-        "total_cost": summary.total_cost,
-        "net_profit": summary.net_profit,
         "orders_count": summary.orders_count,
         "avg_order_value": summary.avg_order_value,
         "by_day": by_day,

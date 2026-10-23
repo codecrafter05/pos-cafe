@@ -2,7 +2,7 @@
 {% block title %}{{ shop.cafe_name }} — Reports{% endblock %}
 
 {% block content %}
-<h5 class="mb-3">Sales &amp; profit</h5>
+<h5 class="mb-3">Sales</h5>
 
 <div class="card rounded-4 mb-3">
   <div class="card-body row g-2 align-items-end">
@@ -24,31 +24,19 @@
 </div>
 
 <div class="row g-3 mb-3">
-  <div class="col-sm-6 col-xl">
+  <div class="col-sm-6 col-xl-4">
     <div class="card rounded-4 h-100"><div class="card-body">
       <p class="mb-1 text-secondary small">Revenue</p>
       <h5 class="mb-0" id="rptRevenue">—</h5>
     </div></div>
   </div>
-  <div class="col-sm-6 col-xl">
-    <div class="card rounded-4 h-100"><div class="card-body">
-      <p class="mb-1 text-secondary small">Cost</p>
-      <h5 class="mb-0" id="rptCost">—</h5>
-    </div></div>
-  </div>
-  <div class="col-sm-6 col-xl">
-    <div class="card rounded-4 h-100"><div class="card-body">
-      <p class="mb-1 text-secondary small">Profit</p>
-      <h5 class="mb-0" id="rptProfit">—</h5>
-    </div></div>
-  </div>
-  <div class="col-sm-6 col-xl">
+  <div class="col-sm-6 col-xl-4">
     <div class="card rounded-4 h-100"><div class="card-body">
       <p class="mb-1 text-secondary small">Orders</p>
       <h5 class="mb-0" id="rptOrders">—</h5>
     </div></div>
   </div>
-  <div class="col-sm-6 col-xl">
+  <div class="col-sm-6 col-xl-4">
     <div class="card rounded-4 h-100"><div class="card-body">
       <p class="mb-1 text-secondary small">Avg order</p>
       <h5 class="mb-0" id="rptAvg">—</h5>
@@ -74,7 +62,6 @@
             <th class="text-end">Orders</th>
             <th class="text-end">Revenue</th>
             <th class="text-end">Share</th>
-            <th class="text-end">Profit</th>
           </tr>
         </thead>
         <tbody id="rptPayBody"></tbody>
@@ -85,7 +72,7 @@
 
 <div class="card rounded-4">
   <div class="card-body">
-    <h5 class="mb-3 fw-bold">Profit by product</h5>
+    <h5 class="mb-3 fw-bold">Top products</h5>
     <div class="table-responsive">
       <table class="table align-middle mb-0">
         <thead>
@@ -93,8 +80,6 @@
             <th>Product</th>
             <th class="text-end">Units</th>
             <th class="text-end">Revenue</th>
-            <th class="text-end">Cost</th>
-            <th class="text-end">Profit</th>
           </tr>
         </thead>
         <tbody id="rptProdBody"></tbody>
@@ -184,7 +169,7 @@
     var tb = document.getElementById('rptPayBody');
     tb.innerHTML = '';
     if (!rows.length) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-secondary small">No sales in this range</td></tr>';
+      tb.innerHTML = '<tr><td colspan="4" class="text-secondary small">No sales in this range</td></tr>';
       return;
     }
     rows.forEach(function (r) {
@@ -194,8 +179,7 @@
         '<td class="fw-semibold">' + esc(r.label) + '</td>' +
         '<td class="text-end">' + r.orders + '</td>' +
         '<td class="text-end">' + PodCafe.currency(r.revenue) + '</td>' +
-        '<td class="text-end text-secondary">' + share.toFixed(1) + '%</td>' +
-        '<td class="text-end fw-semibold">' + PodCafe.currency(r.profit) + '</td>';
+        '<td class="text-end text-secondary">' + share.toFixed(1) + '%</td>';
       tb.appendChild(tr);
     });
   }
@@ -218,8 +202,6 @@
     var data = await res.json();
     lastReport = data;
     document.getElementById('rptRevenue').textContent = PodCafe.currency(data.revenue);
-    document.getElementById('rptCost').textContent = PodCafe.currency(data.total_cost);
-    document.getElementById('rptProfit').textContent = PodCafe.currency(data.net_profit);
     document.getElementById('rptOrders').textContent = String(data.orders_count);
     document.getElementById('rptAvg').textContent = PodCafe.currency(data.avg_order_value);
     renderChart(
@@ -230,7 +212,7 @@
     var tb = document.getElementById('rptProdBody');
     tb.innerHTML = '';
     if (!(data.by_product || []).length) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-secondary small">No sales in this range</td></tr>';
+      tb.innerHTML = '<tr><td colspan="3" class="text-secondary small">No sales in this range</td></tr>';
       return;
     }
     data.by_product.forEach(function (r) {
@@ -238,9 +220,7 @@
       tr.innerHTML =
         '<td class="fw-semibold">' + esc(r.name) + '</td>' +
         '<td class="text-end">' + r.units_sold + '</td>' +
-        '<td class="text-end">' + PodCafe.currency(r.revenue) + '</td>' +
-        '<td class="text-end text-secondary">' + PodCafe.currency(r.cost) + '</td>' +
-        '<td class="text-end fw-semibold">' + PodCafe.currency(r.profit) + '</td>';
+        '<td class="text-end">' + PodCafe.currency(r.revenue) + '</td>';
       tb.appendChild(tr);
     });
   }
@@ -267,29 +247,28 @@
     if (!lastReport) { PodCafe.toast('Load a report first', 'warning'); return; }
     var lines = [];
     lines.push('Summary');
-    lines.push(['from', 'to', 'revenue', 'cost', 'profit', 'orders', 'avg_order'].join(','));
+    lines.push(['from', 'to', 'revenue', 'orders', 'avg_order'].join(','));
     lines.push([
       lastReport.date_from, lastReport.date_to,
-      lastReport.revenue, lastReport.total_cost, lastReport.net_profit,
-      lastReport.orders_count, lastReport.avg_order_value
+      lastReport.revenue, lastReport.orders_count, lastReport.avg_order_value
     ].map(csvCell).join(','));
     lines.push('');
     lines.push('By day');
-    lines.push(['date', 'revenue', 'cost', 'profit', 'orders'].join(','));
+    lines.push(['date', 'revenue', 'orders'].join(','));
     (lastReport.by_day || []).forEach(function (r) {
-      lines.push([r.date, r.revenue, r.cost, r.profit, r.orders].map(csvCell).join(','));
+      lines.push([r.date, r.revenue, r.orders].map(csvCell).join(','));
     });
     lines.push('');
     lines.push('By payment method');
-    lines.push(['method', 'orders', 'revenue', 'profit'].join(','));
+    lines.push(['method', 'orders', 'revenue'].join(','));
     (lastReport.by_payment || []).forEach(function (r) {
-      lines.push([r.label, r.orders, r.revenue, r.profit].map(csvCell).join(','));
+      lines.push([r.label, r.orders, r.revenue].map(csvCell).join(','));
     });
     lines.push('');
     lines.push('By product');
-    lines.push(['product', 'units', 'revenue', 'cost', 'profit'].join(','));
+    lines.push(['product', 'units', 'revenue'].join(','));
     (lastReport.by_product || []).forEach(function (r) {
-      lines.push([r.name, r.units_sold, r.revenue, r.cost, r.profit].map(csvCell).join(','));
+      lines.push([r.name, r.units_sold, r.revenue].map(csvCell).join(','));
     });
     var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');

@@ -10,7 +10,6 @@ from app.core.time import period_chart_dates
 from app.models.user import User
 from app.schemas.dashboard import (
     DashboardSummaryOut,
-    InventoryAlertOut,
     PeakHourOut,
     Period,
     SalesChartPointOut,
@@ -60,7 +59,6 @@ def summary(
     s = dashboard_service.dashboard_summary(db, date_from=start, date_to=end)
     return DashboardSummaryOut(
         revenue=s.revenue,
-        net_profit=s.net_profit,
         orders_count=s.orders_count,
         avg_order_value=s.avg_order_value,
         date_from=start.isoformat(),
@@ -122,22 +120,3 @@ def waste(
     start, end = _range(date_from, date_to, period)
     data = dashboard_service.waste_summary(db, date_from=start, date_to=end)
     return WasteSummaryOut(**data, date_from=start.isoformat(), date_to=end.isoformat())
-
-
-@router.get("/inventory-alerts", response_model=list[InventoryAlertOut])
-def inventory_alerts(
-    db: Session = Depends(get_db),
-    _: User = Depends(_admin),
-):
-    items = dashboard_service.inventory_alerts(db)
-    return [InventoryAlertOut.model_validate(x) for x in items]
-
-
-@router.get("/negative-stock", response_model=list[InventoryAlertOut])
-def negative_stock(
-    db: Session = Depends(get_db),
-    _: User = Depends(_admin),
-):
-    """Ingredients sold below zero. Admin-only; never surfaced to cashiers."""
-    items = dashboard_service.negative_stock_materials(db)
-    return [InventoryAlertOut.model_validate(x) for x in items]

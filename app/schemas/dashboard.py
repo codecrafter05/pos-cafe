@@ -10,7 +10,6 @@ Period = Literal["today", "week", "month"]
 
 class DashboardSummaryOut(BaseModel):
     revenue: Decimal
-    net_profit: Decimal
     orders_count: int
     avg_order_value: Decimal
     date_from: str
@@ -42,14 +41,12 @@ class WasteProductOut(BaseModel):
     name_ar: str | None
     units: int
     lost_retail: Decimal
-    lost_cost: Decimal
 
 
 class WasteSummaryOut(BaseModel):
     items_count: int
     products_count: int
     lost_retail: Decimal
-    lost_cost: Decimal
     products: list[WasteProductOut]
     date_from: str
     date_to: str
@@ -59,8 +56,6 @@ class ReportDayOut(BaseModel):
     date: str
     label: str
     revenue: Decimal
-    cost: Decimal
-    profit: Decimal
     orders: int
 
 
@@ -70,8 +65,6 @@ class ReportProductOut(BaseModel):
     name_ar: str | None
     units_sold: int
     revenue: Decimal
-    cost: Decimal
-    profit: Decimal
 
 
 class ReportPaymentOut(BaseModel):
@@ -79,50 +72,17 @@ class ReportPaymentOut(BaseModel):
     label: str
     orders: int
     revenue: Decimal
-    profit: Decimal
 
 
 class ReportSummaryOut(BaseModel):
     date_from: str
     date_to: str
     revenue: Decimal
-    total_cost: Decimal
-    net_profit: Decimal
     orders_count: int
     avg_order_value: Decimal
     by_day: list[ReportDayOut]
     by_product: list[ReportProductOut]
     by_payment: list[ReportPaymentOut] = []
-
-
-class InventoryAlertOut(BaseModel):
-    id: int
-    name: str
-    unit: str
-    current_stock: Decimal
-    min_stock_alert: Decimal
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class PurchaseCreate(BaseModel):
-    raw_material_id: int
-    quantity: Decimal = Field(..., gt=0)
-    unit_cost: Decimal = Field(..., ge=0)
-    notes: str | None = None
-
-
-class PurchaseOut(BaseModel):
-    id: int
-    raw_material_id: int
-    user_id: int
-    quantity: Decimal
-    unit_cost: Decimal
-    total_cost: Decimal
-    purchased_at: UtcDateTime
-    notes: str | None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderStatusUpdate(BaseModel):

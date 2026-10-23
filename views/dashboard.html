@@ -8,22 +8,15 @@
     border: 1px solid rgba(154, 107, 66, 0.14);
     background: linear-gradient(180deg, rgba(255, 250, 244, 0.55), transparent 42%);
   }
-  .dash-waste__title {
-    letter-spacing: -0.02em;
-  }
-  .dash-waste__hint {
-    max-width: 36rem;
-    line-height: 1.45;
-  }
+  .dash-waste__title { letter-spacing: -0.02em; }
+  .dash-waste__hint { max-width: 36rem; line-height: 1.45; }
   .dash-waste__stats {
     display: grid;
     grid-template-columns: 1fr;
     gap: 0.85rem;
   }
   @media (min-width: 768px) {
-    .dash-waste__stats {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+    .dash-waste__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   .dash-waste__stat {
     background: rgba(255, 255, 255, 0.72);
@@ -49,13 +42,7 @@
     color: #6d5f52;
     margin-top: 0.3rem;
   }
-  .dash-waste__stat--loss .dash-waste__stat-value {
-    color: #9a6b42;
-  }
-  .dash-waste__table {
-    width: 100%;
-    margin: 0;
-  }
+  .dash-waste__table { width: 100%; margin: 0; }
   .dash-waste__table th {
     font-size: 0.72rem;
     letter-spacing: 0.05em;
@@ -71,16 +58,14 @@
     vertical-align: middle;
   }
   .dash-waste__list {
-    max-height: 32.5rem; /* header + ~20 compact rows; extra items scroll here */
+    max-height: 32.5rem;
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid rgba(44, 36, 28, 0.08);
     border-radius: 1rem;
     background: rgba(255, 255, 255, 0.62);
   }
-  .dash-waste__list .table-responsive {
-    overflow: visible;
-  }
+  .dash-waste__list .table-responsive { overflow: visible; }
   .dash-waste__table thead th {
     position: sticky;
     top: 0;
@@ -108,15 +93,6 @@
 
   <h5 class="mb-3">Dashboard</h5>
 
-  <div class="alert alert-danger rounded-4 d-none align-items-center gap-3" id="dashNegStock" role="alert">
-    <span class="material-icons-outlined">report_problem</span>
-    <div class="flex-grow-1">
-      <div class="fw-semibold" id="dashNegStockTitle"></div>
-      <div class="small" id="dashNegStockNames"></div>
-    </div>
-    <a class="btn btn-sm btn-danger rounded-3 text-nowrap" href="/menu/inventory?stock=negative">Review Raw materials</a>
-  </div>
-
   <div class="card rounded-4 mb-3">
     <div class="card-body row g-2 align-items-end">
       <div class="col-md-3">
@@ -137,7 +113,7 @@
 
   <div class="row g-3 mb-3">
 
-    <div class="col-xxl-8">
+    <div class="col-xxl-9">
       <div class="card w-100 overflow-hidden rounded-4">
         <div class="card-body position-relative p-4">
           <div class="row align-items-center">
@@ -151,9 +127,7 @@
               </div>
               <div class="d-flex flex-wrap align-items-center gap-4">
                 <div>
-                  <h4 class="mb-1 fw-semibold d-flex align-items-center gap-1" id="dashRevenueBig">
-                    —
-                  </h4>
+                  <h4 class="mb-1 fw-semibold d-flex align-items-center gap-1" id="dashRevenueBig">—</h4>
                   <p class="mb-2 text-secondary">Revenue (period)</p>
                   <div class="progress" style="height:5px;">
                     <div class="progress-bar bg-grd-success" style="width:72%"></div>
@@ -177,7 +151,7 @@
       </div>
     </div>
 
-    <div class="col-sm-6 col-xxl-2">
+    <div class="col-sm-6 col-xxl-3">
       <div class="card rounded-4 h-100">
         <div class="card-body">
           <div class="d-flex align-items-center gap-3 mb-2">
@@ -190,23 +164,6 @@
             </div>
           </div>
           <p class="mb-1 text-secondary" style="font-size:12px;">In selected period</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-sm-6 col-xxl-2">
-      <div class="card rounded-4 h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center gap-3 mb-2">
-            <div class="wh-42 d-flex align-items-center justify-content-center rounded-3 bg-grd-success">
-              <span class="material-icons-outlined text-white">savings</span>
-            </div>
-            <div>
-              <h5 class="mb-0" id="dashProfit">—</h5>
-              <p class="mb-0 text-secondary" style="font-size:12px;">Net profit</p>
-            </div>
-          </div>
-          <p class="mb-1 text-secondary" style="font-size:12px;">After cancellations; waste stays in cost</p>
         </div>
       </div>
     </div>
@@ -244,35 +201,19 @@
     <div class="col-lg-6">
       <div class="card rounded-4 h-100">
         <div class="card-body">
-          <h5 class="mb-3 fw-bold">Low stock</h5>
-          <div id="dashAlerts" class="small text-secondary">Loading…</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-6">
-      <div class="card rounded-4 h-100">
-        <div class="card-body">
           <h5 class="mb-3 fw-bold">Peak hours (selected period)</h5>
           <div id="dashPeak" class="small text-secondary">Loading…</div>
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="row g-3 mb-3">
-    <div class="col-12">
-      <div class="card rounded-4 dash-waste">
+    <div class="col-lg-6">
+      <div class="card rounded-4 dash-waste h-100">
         <div class="card-body p-4">
           <div class="mb-4">
             <h5 class="dash-waste__title fw-bold mb-1">Waste</h5>
-            <p class="dash-waste__hint mb-0 text-secondary small">Dishes that were made but not sold — wrong ticket, kitchen mistake, or anything similar. Ingredients stay used and are not returned to stock.</p>
+            <p class="dash-waste__hint mb-0 text-secondary small">Dishes that were made but not sold — wrong ticket, kitchen mistake, or similar.</p>
           </div>
           <div class="dash-waste__stats mb-4">
-            <div class="dash-waste__stat dash-waste__stat--loss">
-              <div class="dash-waste__stat-label">Money lost</div>
-              <div class="dash-waste__stat-value" id="dashWasteCost">—</div>
-              <div class="dash-waste__stat-note">Ingredient cost of wasted dishes</div>
-            </div>
             <div class="dash-waste__stat">
               <div class="dash-waste__stat-label">Could have sold</div>
               <div class="dash-waste__stat-value" id="dashWasteRetail">—</div>
@@ -319,7 +260,7 @@
       chart.destroy();
       chart = null;
     }
-    var opts = {
+    chart = new ApexCharts(el, {
       series: [{ name: 'Revenue', data: series }],
       chart: { type: 'area', height: 220, toolbar: { show: false } },
       dataLabels: { enabled: false },
@@ -330,8 +271,7 @@
       colors: ['#0d6efd'],
       tooltip: { y: { formatter: function (v) { return PodCafe.currency(v); } } },
       grid: { borderColor: '#f1f1f1' }
-    };
-    chart = new ApexCharts(el, opts);
+    });
     chart.render();
   }
 
@@ -384,16 +324,16 @@
     document.getElementById('dashRevenueBig').textContent = PodCafe.currency(d.revenue);
     document.getElementById('dashOrdersBig').textContent = String(d.orders_count);
     document.getElementById('dashAvgOrder').textContent = PodCafe.currency(d.avg_order_value);
-    document.getElementById('dashProfit').textContent = PodCafe.currency(d.net_profit);
   }
 
   async function loadChart() {
     var res = await PodCafe.apiFetch('/api/v1/dashboard/sales-chart?' + rangeQuery());
     if (!res.ok) return;
     var rows = await res.json();
-    var s = rows.map(function (r) { return Number(r.revenue); });
-    var lbl = rows.map(function (r) { return r.label; });
-    renderChart(s, lbl);
+    renderChart(
+      rows.map(function (r) { return Number(r.revenue); }),
+      rows.map(function (r) { return r.label; })
+    );
     var badge = document.getElementById('dashChartBadge');
     if (badge) {
       badge.textContent = formatRangeLabel(
@@ -433,14 +373,12 @@
     var wrap = document.getElementById('dashWasteProducts');
     var res = await PodCafe.apiFetch('/api/v1/dashboard/waste?' + rangeQuery());
     if (!res.ok) {
-      document.getElementById('dashWasteCost').textContent = '—';
       document.getElementById('dashWasteRetail').textContent = '—';
       document.getElementById('dashWasteCount').textContent = '—';
       wrap.innerHTML = '<div class="dash-waste__empty">Could not load waste for this period.</div>';
       return;
     }
     var d = await res.json();
-    document.getElementById('dashWasteCost').textContent = PodCafe.currency(d.lost_cost);
     document.getElementById('dashWasteRetail').textContent = PodCafe.currency(d.lost_retail);
     document.getElementById('dashWasteCount').textContent = String(d.items_count);
     if (!d.products || !d.products.length) {
@@ -451,7 +389,6 @@
       return '<tr>' +
         '<td class="fw-semibold">' + esc(r.name) + '</td>' +
         '<td class="text-center text-secondary">' + r.units + '</td>' +
-        '<td class="text-end">' + PodCafe.currency(r.lost_cost) + '</td>' +
         '<td class="text-end text-secondary">' + PodCafe.currency(r.lost_retail) + '</td>' +
         '</tr>';
     }).join('');
@@ -459,61 +396,12 @@
       '<div class="dash-waste__list">' +
       '<div class="table-responsive">' +
       '<table class="table dash-waste__table mb-0">' +
-      '<thead><tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Cost lost</th><th class="text-end">Retail</th></tr></thead>' +
+      '<thead><tr><th>Product</th><th class="text-center">Qty</th><th class="text-end">Retail</th></tr></thead>' +
       '<tbody>' + rows + '</tbody>' +
       '</table></div></div>' +
       (d.products.length > 20
         ? '<p class="dash-waste__more mb-0">Showing 20 at a time — scroll inside the list for the rest (' + d.products.length + ' products).</p>'
         : '');
-  }
-
-  async function loadAlerts() {
-    var box = document.getElementById('dashAlerts');
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/inventory-alerts');
-    if (!res.ok) {
-      box.textContent = 'Could not load alerts';
-      return;
-    }
-    var rows = await res.json();
-    if (!rows.length) {
-      box.innerHTML = '<span class="text-success">All materials above minimum ✓</span>';
-      return;
-    }
-    box.innerHTML = '<ul class="list-unstyled mb-0"></ul>';
-    var ul = box.querySelector('ul');
-    rows.forEach(function (r) {
-      var li = document.createElement('li');
-      li.className = 'mb-2';
-      li.innerHTML =
-        '<span class="fw-semibold">' + esc(r.name) + '</span> — ' +
-        Number(r.current_stock).toFixed(3) + ' / min ' + Number(r.min_stock_alert).toFixed(3) + ' ' + esc(r.unit);
-      ul.appendChild(li);
-    });
-  }
-
-  async function loadNegativeStock() {
-    var box = document.getElementById('dashNegStock');
-    var res = await PodCafe.apiFetch('/api/v1/dashboard/negative-stock');
-    if (!res.ok) {
-      box.classList.add('d-none');
-      return;
-    }
-    var rows = await res.json();
-    if (!rows.length) {
-      box.classList.add('d-none');
-      box.classList.remove('d-flex');
-      return;
-    }
-    document.getElementById('dashNegStockTitle').textContent =
-      rows.length === 1
-        ? '1 ingredient is in negative stock — review Raw materials'
-        : rows.length + ' ingredients are in negative stock — review Raw materials';
-    document.getElementById('dashNegStockNames').textContent =
-      rows.slice(0, 6).map(function (r) {
-        return r.name + ' (' + Number(r.current_stock).toFixed(3) + ' ' + r.unit + ')';
-      }).join(' · ') + (rows.length > 6 ? ' · +' + (rows.length - 6) + ' more' : '');
-    box.classList.remove('d-none');
-    box.classList.add('d-flex');
   }
 
   async function loadPeak() {
@@ -557,8 +445,6 @@
       loadChart(),
       loadTop(),
       loadWaste(),
-      loadAlerts(),
-      loadNegativeStock(),
       loadPeak()
     ]);
   }
