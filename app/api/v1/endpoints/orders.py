@@ -21,7 +21,7 @@ from app.schemas.orders import (
     OrderListOut,
     OrderOut,
 )
-from app.services import inventory_service, order_service, whatsapp_service
+from app.services import order_service, whatsapp_service
 from app.services.order_numbering import daily_order_number_for, daily_order_numbers_by_id
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,9 @@ def update_order_status(
     old_status = order.status
     if body.status == "cancelled" and old_status != "cancelled":
         try:
-            inventory_service.reverse_sale_deductions_for_order(db, order_id=order.id)
+            for item in order.items:
+                if (item.line_status or "sold") == "sold":
+                    item.line_status = "cancelled"
             order_service.recompute_order_totals(db, order)
         except Exception:
             db.rollback()

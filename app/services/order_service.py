@@ -2,19 +2,14 @@ from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.inventory_movement import InventoryMovement
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.product_modifier import ProductModifier
-from app.models.product_recipe import ProductRecipe
-from app.models.raw_material import RawMaterial
 from app.models.user import User
 from app.schemas.orders import OrderCreate, OrderItemIn, OrderModifierSnapshot
-from app.services import inventory_service
 
 
 def get_or_create_online_store_user(db: Session) -> User:
@@ -40,6 +35,7 @@ def get_or_create_online_store_user(db: Session) -> User:
 def _resolve_selected_modifiers(
     db: Session, product_id: int, selected: list[OrderModifierSnapshot]
 ) -> tuple[list[ProductModifier], Decimal]:
+    """Resolve selected options by (group_name, option_name); price from server."""
     if not selected:
         return [], Decimal("0")
     existing: dict[tuple[str, str], ProductModifier] = {
@@ -76,7 +72,7 @@ def _create_order_from_items(
     device_id: str | None = None,
     created_at: datetime | None = None,
 ) -> Order:
-    prepared: list[tuple[OrderItemIn, Product, Decimal, list[ProductModifier]]] = []
+    prepared: list[tuple[OrderItemIn, Product, Decimal]] = []
 
     for line in items:
         product = (
@@ -90,23 +86,8 @@ def _create_order_from_items(
                 detail=f"Product {line.product_id} not available",
             )
 
-        has_recipe = (
-            db.query(ProductRecipe.id)
-            .filter(ProductRecipe.product_id == product.id)
-            .first()
-            is not None
-        )
-        if not has_recipe:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Cannot sell “{product.name}”: no recipe is configured. "
-                    "Add ingredients on the product page before selling."
-                ),
-            )
-
-        resolved_mods, extras = _resolve_selected_modifiers(db, product.id, line.modifiers)
-        prepared.append((line, product, extras, resolved_mods))
+        _, extras = _resolve_selected_modifiers(db, product.id, line.modifiers)
+        prepared.append((line, product, extras))
 
     order = Order(
         user_id=user_id,
@@ -129,9 +110,8 @@ def _create_order_from_items(
     db.flush()
 
     total_amount = Decimal("0")
-    total_cost = Decimal("0")
 
-    for line, product, extras, resolved_mods in prepared:
+    for line, product, extras in prepared:
         unit_price = product.price + extras
         line_revenue = unit_price * line.quantity
 
@@ -147,33 +127,11 @@ def _create_order_from_items(
             line_status="sold",
         )
         db.add(item)
-        db.flush()
-
-        skip_ids = inventory_service.substituted_raw_material_ids(db, resolved_mods)
-        unit_cost = inventory_service.apply_sale_deduction_for_product(
-            db,
-            product_id=product.id,
-            quantity=line.quantity,
-            order_id=order.id,
-            order_item_id=item.id,
-            skip_raw_material_ids=skip_ids,
-        )
-        unit_cost += inventory_service.apply_sale_deduction_for_modifiers(
-            db,
-            modifiers=resolved_mods,
-            quantity=line.quantity,
-            order_id=order.id,
-            order_item_id=item.id,
-        )
-        item.unit_cost = unit_cost
-        line_cost = unit_cost * Decimal(line.quantity)
-
         total_amount += line_revenue
-        total_cost += line_cost
 
     order.total_amount = total_amount
-    order.total_cost = total_cost
-    order.profit = total_amount - total_cost
+    order.total_cost = Decimal("0")
+    order.profit = total_amount
     db.flush()
 
     return (
@@ -208,7 +166,7 @@ def create_device_order(
     device_id: str | None = None,
     created_at: datetime | None = None,
 ) -> Order:
-    """In-person sale from a Sunmi companion device. Same stock/recipe path as POS."""
+    """In-person sale from a Sunmi companion device."""
     return _create_order_from_items(
         db,
         user_id=user.id,
@@ -249,44 +207,26 @@ def create_online_order(
     )
 
 
-def recompute_product_cost_price(db: Session, product_id: int) -> None:
-    product = db.get(Product, product_id)
-    if product is None:
-        return
-    lines = db.query(ProductRecipe).filter(ProductRecipe.product_id == product_id).all()
-    total = Decimal("0")
-    for line in lines:
-        rm = db.get(RawMaterial, line.raw_material_id)
-        if rm is None:
-            continue
-        total += line.quantity_used * rm.cost_per_unit
-    product.cost_price = total
-
-
 def recompute_order_totals(db: Session, order: Order) -> Order:
-    """Sold lines count as revenue; wasted lines keep cost (no restock); cancelled drop both."""
+    """Sold lines count as revenue; wasted lines drop revenue; cancelled drop both."""
     total_amount = Decimal("0")
-    total_cost = Decimal("0")
     sold = 0
     wasted = 0
     cancelled = 0
     for item in order.items:
         status = item.line_status or "sold"
         line_price = item.unit_price * Decimal(item.quantity)
-        line_cost = item.unit_cost * Decimal(item.quantity)
         if status == "cancelled":
             cancelled += 1
             continue
         if status == "wasted":
             wasted += 1
-            total_cost += line_cost
             continue
         sold += 1
         total_amount += line_price
-        total_cost += line_cost
     order.total_amount = total_amount
-    order.total_cost = total_cost
-    order.profit = total_amount - total_cost
+    order.total_cost = Decimal("0")
+    order.profit = total_amount
     if sold == 0 and wasted == 0 and cancelled > 0:
         order.status = "cancelled"
     db.flush()
@@ -307,36 +247,19 @@ def set_order_item_line_status(db: Session, *, order: Order, item: OrderItem, ne
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"This item is already {current}",
         )
-    if new_status == "cancelled":
-        inventory_service.reverse_sale_deductions_for_item(db, item=item)
     item.line_status = new_status
     db.flush()
     return recompute_order_totals(db, order)
 
 
 def delete_cancelled_order(db: Session, order: Order) -> None:
-    """Hard-delete a cancelled order and its child rows.
-
-    Non-cancelled orders are blocked so stock is restored via the existing
-    cancel path before the sale (and its movement history) disappears.
-    """
+    """Hard-delete a cancelled order and its child rows."""
     if (order.status or "") != "cancelled":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cancel this order first so stock is restored, then you can delete it.",
+            detail="Cancel this order first, then you can delete it.",
         )
     order_id = order.id
-    item_ids = [
-        row[0]
-        for row in db.query(OrderItem.id).filter(OrderItem.order_id == order_id).all()
-    ]
-    movement_filter = InventoryMovement.order_id == order_id
-    if item_ids:
-        movement_filter = or_(
-            InventoryMovement.order_id == order_id,
-            InventoryMovement.order_item_id.in_(item_ids),
-        )
-    db.query(InventoryMovement).filter(movement_filter).delete(synchronize_session=False)
     db.query(OrderItem).filter(OrderItem.order_id == order_id).delete(synchronize_session=False)
     db.query(Order).filter(Order.id == order_id).delete(synchronize_session=False)
     db.flush()
